@@ -33,7 +33,6 @@
         th { background-color: #1f242c; color: #00d2ff; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px; border-bottom: 2px solid #00d2ff; }
         tr:hover { background-color: #161b22; }
 
-        /* Estilo para los inputs editables */
         .score-input {
             width: 60px;
             background: #21262d;
@@ -51,7 +50,6 @@
             background: #0d1117;
             box-shadow: 0 0 5px rgba(0, 210, 255, 0.3);
         }
-        /* Estilo para celdas deshabilitadas (no participó) */
         .score-input:disabled {
             background: #12151a;
             color: #484f58;
@@ -66,7 +64,7 @@
 
     <div class="card">
         <h1>Histórico de Clasificaciones 🎵</h1>
-        <p>Matriz de puntuaciones por país y año. Edita una celda para crear un nuevo registro actualizado en el histórico.</p>
+        <p>Matriz de puntuaciones por país y año. Los países retirados no se pueden editar.</p>
         <div id="status">Conectando con la base de datos...</div>
         
         <div style="overflow-x: auto;">
@@ -92,34 +90,31 @@
             const tableBody = document.getElementById('table-body');
             
             try {
-                // 1. Obtenemos los datos de la tabla festival (países, años de participación, ids)
+                // 1. Obtenemos los datos de la tabla festival (incluyendo 'withdrawn')
                 const resFestival = await fetch(`${SUPABASE_URL}/festival?select=*`, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
                 });
                 const festivalData = await resFestival.json();
 
-                // Mapeo para saber qué países participaron en qué año: participacionMap[country][year] = true
-                const participacionMap = {};
+                const withdrawnMap = {};
                 const countryIdMap = {};
                 
                 festivalData.forEach(item => {
                     countryIdMap[item.country] = item.id;
-                    if (!participacionMap[item.country]) participacionMap[item.country] = {};
-                    // Asumimos que si está en festival para ese año (o general), participó. 
-                    // Si tu tabla festival tiene una columna 'year', la usamos, si no, asumimos todos los años.
-                    const fYear = item.year || 2026; 
-                    participacionMap[item.country][fYear] = true;
+                    const fYear = item.year || 2026;
+                    if (!withdrawnMap[item.country]) withdrawnMap[item.country] = {};
+                    // Guardamos si está retirado en ese año
+                    withdrawnMap[item.country][fYear] = item.withdrawn;
                 });
 
                 const countries = [...new Set(festivalData.map(item => item.country))].sort();
 
-                // 2. Obtenemos todos los scores almacenados ordenados por fecha ascendente para coger siempre el más reciente al final
+                // 2. Obtenemos todos los scores almacenados
                 const resScores = await fetch(`${SUPABASE_URL}/scores?select=*&order=date.asc`, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
                 });
                 const scoresData = await resScores.json();
 
-                // 3. Extraemos todos los años únicos
                 const years = [...new Set(scoresData.map(item => item.year))].sort((a, b) => a - b);
 
                 if (countries.length === 0 || years.length === 0) {
@@ -129,7 +124,6 @@
                 statusDiv.innerHTML = `✅ ¡Conexión exitosa! Matriz cargada (${years.join(', ')}).`;
                 statusDiv.style.color = '#3fb950';
 
-                // 4. Construimos las cabeceras
                 headerRow.innerHTML = '<th>Países</th>';
                 years.forEach(year => {
                     const th = document.createElement('th');
@@ -137,17 +131,13 @@
                     headerRow.appendChild(th);
                 });
 
-                // 5. Mapeo para buscar la puntuación MÁS RECIENTE: scoresMap[country][year] = score
-                // Como vienen ordenados por fecha ascendente, los últimos machacan a los primeros, quedándonos con el más reciente.
                 const scoresMap = {};
                 scoresData.forEach(s => {
                     if (!scoresMap[s.country]) scoresMap[s.country] = {};
                     scoresMap[s.country][s.year] = s.score;
                 });
 
-                // 6. Rellenamos las filas
                 tableBody.innerHTML = '';
-                countries.framework = ''; // limpio
                 countries.forEach(country => {
                     const row = document.createElement('tr');
                     
@@ -158,24 +148,21 @@
                     years.forEach(year => {
                         const td = document.createElement('td');
                         
-                        // Verificamos si participó ese año (si no está en participacionMap para ese año, se considera que no participó)
-                        const haParticipado = participacionMap[country] && participacionMap[country][year];
+                        // Verificamos si el país está retirado (withdrawn == true)
+                        const isWithdrawn = withdrawnMap[country] && withdrawnMap[country][year] === true;
 
                         const input = document.createElement('input');
                         input.type = 'text';
                         input.className = 'score-input';
 
-                        if (!haParticipado) {
-                            // No participó -> Bloqueado y marcado con '-'
+                        if (isWithdrawn) {
                             input.value = '-';
                             input.disabled = true;
                         } else {
-                            // Participó -> Comprobamos si tiene score guardado
                             const score = scoresMap[country] ? scoresMap[country][year] : undefined;
                             input.value = (score !== undefined && score !== null) ? score : '-';
 
-                            // Evento para guardar una NUEVA tupla en el histórico al modificar
-                            const guardarNuevoHistorico = async () => {
+                            const guardarCambio = async () => {
                                 let val = input.value.trim();
                                 let numericScore = null;
 
@@ -190,7 +177,6 @@
                                     }
                                 }
 
-                                // Fecha actual en hora de España (Europe/Madrid)
                                 const options = { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' };
                                 const formatter = new Intl.DateTimeFormat('es-ES', options);
                                 const parts = formatter.formatToParts(new Date());
@@ -201,36 +187,35 @@
 
                                 const countryId = countryIdMap[country];
 
-                                statusDiv.innerHTML = '⏳ Guardando nueva tupla histórica...';
+                                statusDiv.innerHTML = '⏳ Guardando en BBDD...';
                                 statusDiv.style.color = '#d29922';
 
                                 try {
-                                    // Quitamos el 'Prefer: resolution=merge-duplicates' para forzar la creación de un nuevo registro (tupla)
+                                    // Usamos upsert con merge-duplicates para actualizar el registro del año correctamente sin chocar con la primary key (id, year)
                                     const response = await fetch(`${SUPABASE_URL}/scores`, {
-                                    method: 'POST',
-                                    headers: {
-                                        'apikey': SUPABASE_ANON_KEY,
-                                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-                                        'Content-Type': 'application/json',
-                                        'Prefer': 'return=minimal'
-                                    },
-                                    body: JSON.stringify({
-                                        id: countryId,
-                                        country: country,
-                                        year: year,
-                                        date: spanishDate,
-                                        score: numericScore
-                                    })
-                                });
+                                        method: 'POST',
+                                        headers: {
+                                            'apikey': SUPABASE_ANON_KEY,
+                                            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                                            'Content-Type': 'application/json',
+                                            'Prefer': 'resolution=merge-duplicates'
+                                        },
+                                        body: JSON.stringify({
+                                            id: countryId,
+                                            country: country,
+                                            year: year,
+                                            date: spanishDate,
+                                            score: numericScore
+                                        })
+                                    });
 
                                     if (!response.ok) {
-                                        throw new Error('Error al insertar nuevo registro en Supabase');
+                                        throw new Error('Error al guardar en Supabase');
                                     }
 
-                                    statusDiv.innerHTML = `✅ Nuevo histórico guardado para ${country} (${year}) con fecha ${spanishDate}.`;
+                                    statusDiv.innerHTML = `✅ Puntuación actualizada para ${country} (${year}) con fecha ${spanishDate}.`;
                                     statusDiv.style.color = '#3fb950';
                                     
-                                    // Actualizamos el mapa localmente para reflejar el cambio sin recargar toda la página
                                     if (!scoresMap[country]) scoresMap[country] = {};
                                     scoresMap[country][year] = numericScore;
 
@@ -247,7 +232,7 @@
                                 }
                             });
 
-                            input.addEventListener('blur', guardarNuevoHistorico);
+                            input.addEventListener('blur', guardarCambio);
                         }
 
                         td.appendChild(input);
