@@ -4,44 +4,44 @@
     <meta charset="UTF-8">
     <title>Histórico de Clasificaciones - VisionChart</title>
     <style>
-        /* 1. Estilo oscuro y moderno */
+        /* 1. Estilo oscuro con temática azulada */
         body { 
             font-family: Arial, sans-serif; 
             max-width: 1100px; 
             margin: 40px auto; 
             padding: 0 20px; 
-            background: #121216; 
-            color: #e0e0e0; 
+            background: #0d1117; 
+            color: #c9d1d9; 
         }
-        h1 { color: #ff2a85; }
-        p { color: #aaa; }
+        h1 { color: #00d2ff; }
+        p { color: #8b949e; }
         .card { 
-            background: #1e1e24; 
+            background: #161b22; 
             padding: 20px; 
             border-radius: 8px; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.6); 
             margin-bottom: 20px; 
-            border: 1px solid #2a2a35;
+            border: 1px solid #30363d;
         }
         #status { font-weight: bold; margin-bottom: 15px; }
         
         /* Botón de volver */
-        .back-link { display: inline-block; margin-bottom: 15px; color: #ff2a85; text-decoration: none; font-weight: bold; }
+        .back-link { display: inline-block; margin-bottom: 15px; color: #00d2ff; text-decoration: none; font-weight: bold; }
         .back-link:hover { text-decoration: underline; }
 
-        /* Estilos de la tabla en modo oscuro */
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #18181f; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
-        th, td { padding: 10px 15px; text-align: center; border-bottom: 1px solid #2a2a35; border-right: 1px solid #22222b; }
+        /* Estilos de la tabla en modo oscuro azulado */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #0d1117; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
+        th, td { padding: 10px 15px; text-align: center; border-bottom: 1px solid #21262d; border-right: 1px solid #161b22; }
         th:first-child, td:first-child { text-align: left; font-weight: bold; color: #fff; }
-        th { background-color: #252530; color: #ff2a85; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px; border-bottom: 2px solid #ff2a85; }
-        tr:hover { background-color: #20202a; }
+        th { background-color: #1f242c; color: #00d2ff; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px; border-bottom: 2px solid #00d2ff; }
+        tr:hover { background-color: #161b22; }
 
         /* Estilo para los inputs editables de puntuación */
         .score-input {
             width: 60px;
-            background: #2a2a35;
-            color: #fff;
-            border: 1px solid #444;
+            background: #21262d;
+            color: #f0f6fc;
+            border: 1px solid #30363d;
             border-radius: 4px;
             padding: 5px;
             text-align: center;
@@ -50,10 +50,10 @@
         }
         .score-input:focus {
             outline: none;
-            border-color: #ff2a85;
-            background: #121216;
+            border-color: #00d2ff;
+            background: #0d1117;
+            box-shadow: 0 0 5px rgba(0, 210, 255, 0.3);
         }
-        .no-score { color: #666; font-style: italic; }
     </style>
 </head>
 <body>
@@ -96,7 +96,6 @@
                 });
                 const festivalData = await resFestival.json();
 
-                // Mapeo útil: country -> id base (ej: "Albania" -> 2601)
                 const countryIdMap = {};
                 festivalData.forEach(item => {
                     countryIdMap[item.country] = item.id;
@@ -118,7 +117,7 @@
                 }
 
                 statusDiv.innerHTML = `✅ ¡Conexión exitosa! Matriz cargada (${years.join(', ')}).`;
-                statusDiv.style.color = '#2ecc71';
+                statusDiv.style.color = '#3fb950';
 
                 // 4. Construimos las cabeceras de la tabla
                 headerRow.innerHTML = '<th>Países</th>';
@@ -128,7 +127,7 @@
                     headerRow.appendChild(th);
                 });
 
-                // 5. Mapeo para buscar notas rápidamente: scoresMap[country][year] = score
+                // 5. Mapeo para buscar notas rápidamente
                 const scoresMap = {};
                 scoresData.forEach(s => {
                     if (!scoresMap[s.country]) scoresMap[s.country] = {};
@@ -151,10 +150,8 @@
                         const input = document.createElement('input');
                         input.type = 'text';
                         input.className = 'score-input';
-                        // Si es null o undefined, mostramos '//', si tiene valor lo ponemos
                         input.value = (score !== undefined && score !== null) ? score : '//';
 
-                        // Guardar al pulsar Enter o al perder el foco (blur)
                         const guardarCambio = async () => {
                             let val = input.value.trim();
                             let numericScore = null;
@@ -170,15 +167,21 @@
                                 }
                             }
 
-                            // Obtenemos la fecha actual en formato YYYY-MM-DD para el histórico
-                            const today = new Date().toISOString().split('T')[0];
+                            // Obtenemos la fecha exacta en la zona horaria de España (Europe/Madrid) en formato YYYY-MM-DD
+                            const options = { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' };
+                            const formatter = new Intl.DateTimeFormat('es-ES', options);
+                            const parts = formatter.formatToParts(new Date());
+                            const day = parts.find(p => p.type === 'day').value;
+                            const month = parts.find(p => p.type === 'month').value;
+                            const yearDate = parts.find(p => p.type === 'year').value;
+                            const spanishDate = `${yearDate}-${month}-${day}`;
+
                             const countryId = countryIdMap[country];
 
                             statusDiv.innerHTML = '⏳ Guardando en BBDD...';
-                            statusDiv.style.color = '#f39c12';
+                            statusDiv.style.color = '#d29922';
 
                             try {
-                                // Usamos UPSERT (Prefer: resolution=merge-duplicates) en Supabase
                                 const response = await fetch(`${SUPABASE_URL}/scores`, {
                                     method: 'POST',
                                     headers: {
@@ -191,7 +194,7 @@
                                         id: countryId,
                                         country: country,
                                         year: year,
-                                        date: today,
+                                        date: spanishDate,
                                         score: numericScore
                                     })
                                 });
@@ -200,18 +203,18 @@
                                     throw new Error('Error al guardar en Supabase');
                                 }
 
-                                statusDiv.innerHTML = `✅ Puntuación actualizada para ${country} (${year}).`;
-                                statusDiv.style.color = '#2ecc71';
+                                statusDiv.innerHTML = `✅ Puntuación actualizada para ${country} (${year}) con fecha ${spanishDate}.`;
+                                statusDiv.style.color = '#3fb950';
                             } catch (err) {
                                 statusDiv.innerHTML = '❌ Error al actualizar: ' + err.message;
-                                statusDiv.style.color = '#e74c3c';
+                                statusDiv.style.color = '#f85149';
                                 console.error(err);
                             }
                         };
 
                         input.addEventListener('keydown', (e) => {
                             if (e.key === 'Enter') {
-                                input.blur(); // Esto dispara el evento blur y guarda
+                                input.blur();
                             }
                         });
 
@@ -226,7 +229,7 @@
 
             } catch (error) {
                 statusDiv.innerHTML = '❌ Error al cargar el histórico: ' + error.message;
-                statusDiv.style.color = '#e74c3c';
+                statusDiv.style.color = '#f85149';
                 console.error('Error detallado:', error);
             }
         }
