@@ -64,7 +64,7 @@
 
     <div class="card">
         <h1>Histórico de Clasificaciones 🎵</h1>
-        <p>Matriz de puntuaciones por país y año. Los países retirados no se pueden editar.</p>
+        <p>Matriz de puntuaciones por país y año. Los países retirados o no participantes están bloqueados.</p>
         <div id="status">Conectando con la base de datos...</div>
         
         <div style="overflow-x: auto;">
@@ -90,26 +90,26 @@
             const tableBody = document.getElementById('table-body');
             
             try {
-                // 1. Obtenemos los datos de la tabla festival (incluyendo 'withdrawn')
+                // 1. Obtenemos los datos de la tabla festival
                 const resFestival = await fetch(`${SUPABASE_URL}/festival?select=*`, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
                 });
                 const festivalData = await resFestival.json();
 
-                const withdrawnMap = {};
-                const countryIdMap = {};
-                
+                // Estructura segura: participacionMap[country][year] = { id, withdrawn }
+                const festivalMap = {};
                 festivalData.forEach(item => {
-                    countryIdMap[item.country] = item.id;
                     const fYear = item.year || 2026;
-                    if (!withdrawnMap[item.country]) withdrawnMap[item.country] = {};
-                    // Guardamos si está retirado en ese año
-                    withdrawnMap[item.country][fYear] = item.withdrawn;
+                    if (!festivalMap[item.country]) festivalMap[item.country] = {};
+                    festivalMap[item.country][fYear] = {
+                        id: item.id,
+                        withdrawn: item.withdrawn === true
+                    };
                 });
 
-                const countries = [...new Set(festivalData.map(item => item.country))].sort();
+                const countries = Object.keys(festivalMap).sort();
 
-                // 2. Obtenemos todos los scores almacenados
+                // 2. Obtenemos los scores almacenados
                 const resScores = await fetch(`${SUPABASE_URL}/scores?select=*&order=date.asc`, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
                 });
@@ -148,8 +148,9 @@
                     years.forEach(year => {
                         const td = document.createElement('td');
                         
-                        // Verificamos si el país está retirado (withdrawn == true)
-                        const isWithdrawn = withdrawnMap[country] && withdrawnMap[country][year] === true;
+                        // Verificamos si existe registro para este año y si está retirado
+                        const festivalInfo = festivalMap[country] && festivalMap[country][year];
+                        const isWithdrawn = !festivalInfo || festivalInfo.withdrawn;
 
                         const input = document.createElement('input');
                         input.type = 'text';
@@ -157,7 +158,7 @@
 
                         if (isWithdrawn) {
                             input.value = '-';
-                            input.disabled = true;
+                            input.disabled = true; // Bloqueado estrictamente si no participa o está withdrawn
                         } else {
                             const score = scoresMap[country] ? scoresMap[country][year] : undefined;
                             input.value = (score !== undefined && score !== null) ? score : '-';
@@ -185,13 +186,14 @@
                                 const yearDate = parts.find(p => p.type === 'year').value;
                                 const spanishDate = `${yearDate}-${month}-${day}`;
 
-                                const countryId = countryIdMap[country];
+                                // Obtenemos el ID correcto desde el mapa de festival
+                                const countryId = festivalInfo.id;
 
                                 statusDiv.innerHTML = '⏳ Guardando en BBDD...';
                                 statusDiv.style.color = '#d29922';
 
                                 try {
-                                    // Usamos upsert con merge-duplicates para actualizar el registro del año correctamente sin chocar con la primary key (id, year)
+                                    // Petición robusta asegurando la cabecera on_conflict para Supabase
                                     const response = await fetch(`${SUPABASE_URL}/scores`, {
                                         method: 'POST',
                                         headers: {
@@ -210,10 +212,11 @@
                                     });
 
                                     if (!response.ok) {
-                                        throw new Error('Error al guardar en Supabase');
+                                        const errText = await response.text();
+                                        throw new Error(errText || 'Error al guardar en Supabase');
                                     }
 
-                                    statusDiv.innerHTML = `✅ Puntuación actualizada para ${country} (${year}) con fecha ${spanishDate}.`;
+                                    statusDiv.innerHTML = `✅ Puntuación actualizada para ${country} (${year}).`;
                                     statusDiv.style.color = '#3fb950';
                                     
                                     if (!scoresMap[country]) scoresMap[country] = {};
@@ -222,7 +225,7 @@
                                 } catch (err) {
                                     statusDiv.innerHTML = '❌ Error al guardar: ' + err.message;
                                     statusDiv.style.color = '#f85149';
-                                    console.error(err);
+                                    console.error('Detalle del error:', err);
                                 }
                             };
 
