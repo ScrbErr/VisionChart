@@ -21,30 +21,40 @@
         <p>Bienvenida a tu gestor histórico de Eurovisión.</p>
         <div id="status">Conectando con la base de datos...</div>
     </div>
-
+    
     <script>
-        // 1. Tus credenciales de Supabase (reemplaza los textos entre comillas)
-        const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1/';
+        // 1. Tu URL exacta de la Data API de Supabase y tu clave anon
+        const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1/festival?select=*';
         const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
-
-        // 2. Inicializamos la conexión
-        const { createClient } = supabase;
-        const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        // 3. Probamos que conecta leyendo la tabla festival
+    
+        // 2. Probamos la conexión directamente con fetch (sin librerías intermedias)
         async function probarConexion() {
-            const { data, error } = await _supabase.from('festival').select('*');
             const statusDiv = document.getElementById('status');
             
-            if (error) {
-                statusDiv.innerHTML = '❌ Error al conectar: ' + error.message;
-                statusDiv.style.color = 'red';
-            } else {
+            try {
+                const response = await fetch(SUPABASE_URL, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+                    }
+                });
+    
+                if (!response.ok) {
+                    throw new Error('Error HTTP: ' + response.status);
+                }
+    
+                const data = await response.json();
                 statusDiv.innerHTML = '✅ ¡Conexión exitosa! Base de datos lista. Registros en festival: ' + data.length;
                 statusDiv.style.color = 'green';
+                console.log('Datos:', data);
+    
+            } catch (error) {
+                statusDiv.innerHTML = '❌ Error al conectar: ' + error.message;
+                statusDiv.style.color = 'red';
+                console.error('Error detallado:', error);
             }
         }
-
+    
         probarConexion();
     </script>
 
