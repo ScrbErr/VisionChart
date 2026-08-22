@@ -4,22 +4,56 @@
     <meta charset="UTF-8">
     <title>Histórico de Clasificaciones - VisionChart</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 1100px; margin: 40px auto; padding: 0 20px; background: #f4f4f9; color: #333; }
+        /* 1. Estilo oscuro y moderno */
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 1100px; 
+            margin: 40px auto; 
+            padding: 0 20px; 
+            background: #121216; 
+            color: #e0e0e0; 
+        }
         h1 { color: #ff2a85; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        p { color: #aaa; }
+        .card { 
+            background: #1e1e24; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+            margin-bottom: 20px; 
+            border: 1px solid #2a2a35;
+        }
         #status { font-weight: bold; margin-bottom: 15px; }
         
         /* Botón de volver */
         .back-link { display: inline-block; margin-bottom: 15px; color: #ff2a85; text-decoration: none; font-weight: bold; }
         .back-link:hover { text-decoration: underline; }
 
-        /* Estilos de la tabla de matriz histórica */
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 3px rgba(0,0,0,0.05); }
-        th, td { padding: 10px 15px; text-align: center; border-bottom: 1px solid #eee; border-right: 1px solid #f0f0f0; }
-        th:first-child, td:first-child { text-align: left; font-weight: bold; }
-        th { background-color: #ff2a85; color: white; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px; }
-        tr:hover { background-color: #f9f9f9; }
-        .no-score { color: #888; background-color: #f2f2f2; font-style: italic; }
+        /* Estilos de la tabla en modo oscuro */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #18181f; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        th, td { padding: 10px 15px; text-align: center; border-bottom: 1px solid #2a2a35; border-right: 1px solid #22222b; }
+        th:first-child, td:first-child { text-align: left; font-weight: bold; color: #fff; }
+        th { background-color: #252530; color: #ff2a85; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px; border-bottom: 2px solid #ff2a85; }
+        tr:hover { background-color: #20202a; }
+
+        /* Estilo para los inputs editables de puntuación */
+        .score-input {
+            width: 60px;
+            background: #2a2a35;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 5px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .score-input:focus {
+            outline: none;
+            border-color: #ff2a85;
+            background: #121216;
+        }
+        .no-score { color: #666; font-style: italic; }
     </style>
 </head>
 <body>
@@ -28,7 +62,7 @@
 
     <div class="card">
         <h1>Histórico de Clasificaciones 🎵</h1>
-        <p>Matriz de puntuaciones por país y año en Eurovisión.</p>
+        <p>Matriz de puntuaciones por país y año. Edita una celda y pulsa Enter o clica fuera para guardar.</p>
         <div id="status">Conectando con la base de datos...</div>
         
         <div style="overflow-x: auto;">
@@ -56,13 +90,18 @@
             const tableBody = document.getElementById('table-body');
             
             try {
-                // 1. Obtenemos los países únicos desde la tabla festival
-                const resFestival = await fetch(`${SUPABASE_URL}/festival?select=country&order=country.asc`, {
+                // 1. Obtenemos los países y sus IDs de la tabla festival
+                const resFestival = await fetch(`${SUPABASE_URL}/festival?select=id,country&order=country.asc`, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
                 });
                 const festivalData = await resFestival.json();
 
-                // Extraemos una lista limpia y única de países ordenados
+                // Mapeo útil: country -> id base (ej: "Albania" -> 2601)
+                const countryIdMap = {};
+                festivalData.forEach(item => {
+                    countryIdMap[item.country] = item.id;
+                });
+
                 const countries = [...new Set(festivalData.map(item => item.country))];
 
                 // 2. Obtenemos todos los scores almacenados
@@ -78,10 +117,10 @@
                     throw new Error('No hay suficientes datos en las tablas festival o scores.');
                 }
 
-                statusDiv.innerHTML = `✅ ¡Conexión exitosa! Mostrando matriz histórica (${years.join(', ')}).`;
-                statusDiv.style.color = 'green';
+                statusDiv.innerHTML = `✅ ¡Conexión exitosa! Matriz cargada (${years.join(', ')}).`;
+                statusDiv.style.color = '#2ecc71';
 
-                // 4. Construimos las cabeceras de la tabla (Países + Años)
+                // 4. Construimos las cabeceras de la tabla
                 headerRow.innerHTML = '<th>Países</th>';
                 years.forEach(year => {
                     const th = document.createElement('th');
@@ -89,34 +128,96 @@
                     headerRow.appendChild(th);
                 });
 
-                // 5. Creamos un mapa rápido para buscar notas: scoresMap[country][year] = score
+                // 5. Mapeo para buscar notas rápidamente: scoresMap[country][year] = score
                 const scoresMap = {};
                 scoresData.forEach(s => {
                     if (!scoresMap[s.country]) scoresMap[s.country] = {};
                     scoresMap[s.country][s.year] = s.score;
                 });
 
-                // 6. Rellenamos las filas de la tabla por cada país
+                // 6. Rellenamos las filas con inputs interactivos
                 tableBody.innerHTML = '';
                 countries.forEach(country => {
                     const row = document.createElement('tr');
                     
-                    // Columna del país
                     const countryTd = document.createElement('td');
                     countryTd.textContent = country;
                     row.appendChild(countryTd);
 
-                    // Columnas de los años
                     years.forEach(year => {
                         const td = document.createElement('td');
                         const score = scoresMap[country] ? scoresMap[country][year] : undefined;
 
-                        if (score !== undefined && score !== null) {
-                            td.textContent = score;
-                        } else {
-                            td.textContent = '//';
-                            td.classList.add('no-score');
-                        }
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.className = 'score-input';
+                        // Si es null o undefined, mostramos '//', si tiene valor lo ponemos
+                        input.value = (score !== undefined && score !== null) ? score : '//';
+
+                        // Guardar al pulsar Enter o al perder el foco (blur)
+                        const guardarCambio = async () => {
+                            let val = input.value.trim();
+                            let numericScore = null;
+
+                            if (val === '//' || val === '-') {
+                                numericScore = null;
+                            } else {
+                                numericScore = parseInt(val, 10);
+                                if (isNaN(numericScore) || numericScore < 0 || numericScore > 100) {
+                                    alert('⚠️ Introduce un número entero válido entre 0 y 100 (o "//" si no participó).');
+                                    input.value = (score !== undefined && score !== null) ? score : '//';
+                                    return;
+                                }
+                            }
+
+                            // Obtenemos la fecha actual en formato YYYY-MM-DD para el histórico
+                            const today = new Date().toISOString().split('T')[0];
+                            const countryId = countryIdMap[country];
+
+                            statusDiv.innerHTML = '⏳ Guardando en BBDD...';
+                            statusDiv.style.color = '#f39c12';
+
+                            try {
+                                // Usamos UPSERT (Prefer: resolution=merge-duplicates) en Supabase
+                                const response = await fetch(`${SUPABASE_URL}/scores`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'apikey': SUPABASE_ANON_KEY,
+                                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                                        'Content-Type': 'application/json',
+                                        'Prefer': 'resolution=merge-duplicates'
+                                    },
+                                    body: JSON.stringify({
+                                        id: countryId,
+                                        country: country,
+                                        year: year,
+                                        date: today,
+                                        score: numericScore
+                                    })
+                                });
+
+                                if (!response.ok) {
+                                    throw new Error('Error al guardar en Supabase');
+                                }
+
+                                statusDiv.innerHTML = `✅ Puntuación actualizada para ${country} (${year}).`;
+                                statusDiv.style.color = '#2ecc71';
+                            } catch (err) {
+                                statusDiv.innerHTML = '❌ Error al actualizar: ' + err.message;
+                                statusDiv.style.color = '#e74c3c';
+                                console.error(err);
+                            }
+                        };
+
+                        input.addEventListener('keydown', (e) => {
+                            if (e.key === 'Enter') {
+                                input.blur(); // Esto dispara el evento blur y guarda
+                            }
+                        });
+
+                        input.addEventListener('blur', guardarCambio);
+
+                        td.appendChild(input);
                         row.appendChild(td);
                     });
 
@@ -125,7 +226,7 @@
 
             } catch (error) {
                 statusDiv.innerHTML = '❌ Error al cargar el histórico: ' + error.message;
-                statusDiv.style.color = 'red';
+                statusDiv.style.color = '#e74c3c';
                 console.error('Error detallado:', error);
             }
         }
