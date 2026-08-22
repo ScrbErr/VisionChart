@@ -48,13 +48,14 @@
     </div>
     
     <script>
-        // 1. Tu URL exacta de la Data API de Supabase y tu clave anon
+        // 1. Tu URL exacta y tu clave anon
         const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1/festival?select=*';
         const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
     
-        // 2. Probamos la conexión directamente con fetch (sin librerías intermedias)
-        async function probarConexion() {
+        // 2. Conectamos y pintamos la tabla
+        async function cargarDatosFestival() {
             const statusDiv = document.getElementById('status');
+            const tableBody = document.getElementById('table-body');
             
             try {
                 const response = await fetch(SUPABASE_URL, {
@@ -69,18 +70,39 @@
                 }
     
                 const data = await response.json();
-                statusDiv.innerHTML = '✅ ¡Conexión exitosa! Base de datos lista. Registros en festival: ' + data.length;
+                statusDiv.innerHTML = '✅ ¡Conexión exitosa! Mostrando ' + data.length + ' países participantes.';
                 statusDiv.style.color = 'green';
-                console.log('Datos:', data);
-    
+
+                // Limpiamos la tabla por seguridad
+                tableBody.innerHTML = '';
+
+                // Pintamos cada fila de los 34 países en la tabla
+                data.forEach(item => {
+                    const row = document.createElement('tr');
+                    
+                    if (item.withdrawn) {
+                        row.classList.add('withdrawn');
+                    }
+
+                    row.innerHTML = `
+                        <td><strong>${item.id}</strong></td>
+                        <td>${item.country}</td>
+                        <td>${item.artist !== null ? item.artist : '-'}</td>
+                        <td>${item.song !== null ? item.song : '-'}</td>
+                        <td>${item.withdrawn ? '<span class="badge-withdrawn">Withdrawn</span>' : '<span class="badge-active">Competing</span>'}</td>
+                    `;
+                    
+                    tableBody.appendChild(row);
+                });
+
             } catch (error) {
                 statusDiv.innerHTML = '❌ Error al conectar: ' + error.message;
                 statusDiv.style.color = 'red';
                 console.error('Error detallado:', error);
             }
         }
-    
-        probarConexion();
+
+        cargarDatosFestival();
     </script>
 
 </body>
