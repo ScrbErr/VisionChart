@@ -156,9 +156,13 @@
             const statsContainer = document.getElementById('stats-container');
             
             try {
-                // 1. Obtenemos los datos de la tabla festival
+                // 1. Obtenemos los datos de la tabla festival sin límite de 1000 filas
                 const resFestival = await fetch(`${SUPABASE_URL}/festival?select=*`, {
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+                    headers: { 
+                        'apikey': SUPABASE_ANON_KEY, 
+                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                        'Range': '0-1500'
+                    }
                 });
                 const festivalData = await resFestival.json();
 
@@ -174,9 +178,13 @@
 
                 const countries = Object.keys(festivalMap).sort();
 
-                // 2. Obtenemos los scores almacenados
+                // 2. Obtenemos los scores almacenados también ampliando el rango por seguridad
                 const resScores = await fetch(`${SUPABASE_URL}/scores?select=*&order=date.asc`, {
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+                    headers: { 
+                        'apikey': SUPABASE_ANON_KEY, 
+                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                        'Range': '0-1500'
+                    }
                 });
                 const scoresData = await resScores.json();
 
