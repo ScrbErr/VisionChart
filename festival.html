@@ -29,10 +29,8 @@
         .back-link { display: inline-block; margin-bottom: 15px; color: #00d2ff; text-decoration: none; font-weight: bold; }
         .back-link:hover { text-decoration: underline; }
 
-        /* Contenedor con scroll y celdas fijas */
+        /* Contenedor sin scroll vertical, solo scroll horizontal si hace falta */
         .table-container {
-            max-height: 600px;
-            overflow-y: auto;
             overflow-x: auto;
             margin-top: 15px;
             border-radius: 6px;
@@ -43,7 +41,7 @@
         table { width: 100%; border-collapse: collapse; background: #0d1117; }
         th, td { padding: 10px 15px; text-align: center; border-bottom: 1px solid #21262d; border-right: 1px solid #161b22; white-space: nowrap; }
         
-        /* Primera columna fija (Sticky) */
+        /* Primera columna fija (Sticky horizontalmente) */
         th:first-child, td:first-child {
             position: sticky;
             left: 0;
@@ -59,7 +57,19 @@
             z-index: 3;
         }
 
-        th { background-color: #1f242c; color: #00d2ff; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px; border-bottom: 2px solid #00d2ff; position: sticky; top: 0; z-index: 1; }
+        /* Cabecera fija al hacer scroll en la página */
+        th { 
+            background-color: #1f242c; 
+            color: #00d2ff; 
+            text-transform: uppercase; 
+            font-size: 13px; 
+            letter-spacing: 0.5px; 
+            border-bottom: 2px solid #00d2ff; 
+            position: sticky; 
+            top: 0; 
+            z-index: 2; 
+        }
+        
         tr:hover { background-color: #161b22; }
         tr:hover td:first-child { background-color: #1f242c; }
 
@@ -458,7 +468,7 @@
                 }
             });
 
-            // 2. Gráfica Umbrales y Participantes (Cambiada a tipo LÍNEAS)
+            // 2. Gráfica Umbrales y Participantes
             const ctxUmbrales = document.getElementById('chartUmbralesParticipantes').getContext('2d');
             if (chartsInstance.umbrales) chartsInstance.umbrales.destroy();
 
@@ -484,14 +494,14 @@
                 }
             });
 
-            // 3. Gráfica de Quintenios estilo Lined (Año 1 a Año 5 por lustro)
+            // 3. Gráfica de Quintenios
             const quinteniosMap = {};
             scoresData.forEach(s => {
                 if (s.score !== null && s.score !== undefined) {
                     const qStart = Math.floor(s.year / 5) * 5;
                     const qEnd = qStart + 4;
                     const qLabel = `${qStart}-${qEnd}`;
-                    const offset = s.year - qStart + 1; // Año 1 al 5 dentro del lustro
+                    const offset = s.year - qStart + 1;
 
                     if (!quinteniosMap[qLabel]) {
                         quinteniosMap[qLabel] = { 1: [], 2: [], 3: [], 4: [], 5: [] };
@@ -505,14 +515,14 @@
             const qLabelsOrder = Object.keys(quinteniosMap).sort();
             const palette = ['#1f77b4', '#d62728', '#bcbd22', '#2ca02c', '#ff7f0e', '#9467bd', '#8c564b'];
 
-            const datasetsQuintenios = qLabelsOrder.map((qLabel, index) => {
+            const datasetsQuintenios = qLabelsOrder.qMap((qLabel, index) => {}).map((qLabel, index) => {
                 const dataPoints = [1, 2, 3, 4, 5].map(anioNum => {
                     const arr = quinteniosMap[qLabel][anioNum];
                     if (arr && arr.length > 0) {
                         const sum = arr.reduce((a, b) => a + b, 0);
                         return parseFloat((sum / arr.length).toFixed(1));
                     }
-                    return null; // Si no hay datos en ese año del quintenio
+                    return null;
                 });
 
                 const color = palette[index % palette.length];
