@@ -163,7 +163,7 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
     
         let chartsInstance = {};
-        let scoresData = []; // <--- Declarada aquí de forma global para evitar el error
+        let scoresData = []; 
 
         async function cargarMatrizHistorica() {
             const statusDiv = document.getElementById('status');
@@ -172,7 +172,6 @@
             const tableFooter = document.getElementById('table-footer');
             
             try {
-                // 1. Obtenemos datos de la tabla festival
                 const resFestival = await fetch(`${SUPABASE_URL}/festival?select=*`, {
                     headers: { 
                         'apikey': SUPABASE_ANON_KEY, 
@@ -194,7 +193,6 @@
 
                 const countries = Object.keys(festivalMap).sort();
 
-                // 2. Obtenemos los scores almacenados
                 const resScores = await fetch(`${SUPABASE_URL}/scores?select=*&order=date.asc`, {
                     headers: { 
                         'apikey': SUPABASE_ANON_KEY, 
@@ -202,7 +200,7 @@
                         'Range': '0-3000'
                     }
                 });
-                scoresData = await resScores.json(); // Asignación a la variable global
+                scoresData = await resScores.json();
 
                 const years = [...new Set(scoresData.map(item => item.year))].sort((a, b) => a - b);
 
@@ -310,7 +308,6 @@
                                     if (!scoresMap[country]) scoresMap[country] = {};
                                     scoresMap[country][year] = { score: numericScore, date: spanishDate };
 
-                                    // Actualizar también en el array local scoresData
                                     let existingScoreItem = scoresData.find(item => item.country === country && item.year === year);
                                     if (existingScoreItem) {
                                         existingScoreItem.score = numericScore;
@@ -319,7 +316,6 @@
                                         scoresData.push({ country, year, score: numericScore, date: spanishDate });
                                     }
 
-                                    // Recargar estadísticas y gráficas tras un cambio
                                     actualizarEstadisticasYGraficas(years, countries, festivalMap, scoresMap, headerRow, tableFooter, scoresData);
 
                                 } catch (err) {
@@ -345,7 +341,6 @@
                     tableBody.appendChild(row);
                 });
 
-                // 3. Renderizar estadísticas en tabla y generar gráficas
                 actualizarEstadisticasYGraficas(years, countries, festivalMap, scoresMap, headerRow, tableFooter, scoresData);
 
             } catch (error) {
@@ -433,6 +428,7 @@
         }
 
         function renderizarGraficas(years, statsPorAnio, scoresData) {
+            // 1. Gráfica Evolución Nota Media
             const ctxEvolucion = document.getElementById('chartEvolucionNotas').getContext('2d');
             if (chartsInstance.evolucion) chartsInstance.evolucion.destroy();
 
@@ -462,18 +458,19 @@
                 }
             });
 
+            // 2. Gráfica Umbrales y Participantes (Cambiada a tipo LÍNEAS)
             const ctxUmbrales = document.getElementById('chartUmbralesParticipantes').getContext('2d');
             if (chartsInstance.umbrales) chartsInstance.umbrales.destroy();
 
             chartsInstance.umbrales = new Chart(ctxUmbrales, {
-                type: 'bar',
+                type: 'line',
                 data: {
                     labels: years,
                     datasets: [
-                        { label: 'Participantes', data: years.map(y => statsPorAnio[y].participantes), backgroundColor: '#8b949e' },
-                        { label: 'Notas ≥ 50', data: years.map(y => statsPorAnio[y].count50), backgroundColor: '#3fb950' },
-                        { label: 'Notas ≥ 70', data: years.map(y => statsPorAnio[y].count70), backgroundColor: '#d29922' },
-                        { label: 'Notas ≥ 80', data: years.map(y => statsPorAnio[y].count80), backgroundColor: '#f85149' }
+                        { label: 'Participantes', data: years.map(y => statsPorAnio[y].participantes), borderColor: '#8b949e', backgroundColor: '#8b949e', borderWidth: 2, tension: 0.2 },
+                        { label: 'Notas ≥ 50', data: years.map(y => statsPorAnio[y].count50), borderColor: '#3fb950', backgroundColor: '#3fb950', borderWidth: 2, tension: 0.2 },
+                        { label: 'Notas ≥ 70', data: years.map(y => statsPorAnio[y].count70), borderColor: '#d29922', backgroundColor: '#d29922', borderWidth: 2, tension: 0.2 },
+                        { label: 'Notas ≥ 80', data: years.map(y => statsPorAnio[y].count80), borderColor: '#f85149', backgroundColor: '#f85149', borderWidth: 2, tension: 0.2 }
                     ]
                 },
                 options: {
@@ -487,40 +484,63 @@
                 }
             });
 
+            // 3. Gráfica de Quintenios estilo Lined (Año 1 a Año 5 por lustro)
             const quinteniosMap = {};
             scoresData.forEach(s => {
                 if (s.score !== null && s.score !== undefined) {
                     const qStart = Math.floor(s.year / 5) * 5;
                     const qEnd = qStart + 4;
                     const qLabel = `${qStart}-${qEnd}`;
-                    if (!quinteniosMap[qLabel]) quinteniosMap[qLabel] = { suma: 0, count: 0 };
-                    quinteniosMap[qLabel].suma += s.score;
-                    quinteniosMap[qLabel].count++;
+                    const offset = s.year - qStart + 1; // Año 1 al 5 dentro del lustro
+
+                    if (!quinteniosMap[qLabel]) {
+                        quinteniosMap[qLabel] = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+                    }
+                    if (offset >= 1 && offset <= 5) {
+                        quinteniosMap[qLabel][offset].push(s.score);
+                    }
                 }
             });
 
-            const qLabels = Object.keys(quinteniosMap).sort();
-            const qMedias = qLabels.map(q => (quinteniosMap[q].suma / quinteniosMap[q].count).toFixed(1));
+            const qLabelsOrder = Object.keys(quinteniosMap).sort();
+            const palette = ['#1f77b4', '#d62728', '#bcbd22', '#2ca02c', '#ff7f0e', '#9467bd', '#8c564b'];
+
+            const datasetsQuintenios = qLabelsOrder.map((qLabel, index) => {
+                const dataPoints = [1, 2, 3, 4, 5].map(anioNum => {
+                    const arr = quinteniosMap[qLabel][anioNum];
+                    if (arr && arr.length > 0) {
+                        const sum = arr.reduce((a, b) => a + b, 0);
+                        return parseFloat((sum / arr.length).toFixed(1));
+                    }
+                    return null; // Si no hay datos en ese año del quintenio
+                });
+
+                const color = palette[index % palette.length];
+
+                return {
+                    label: qLabel,
+                    data: dataPoints,
+                    borderColor: color,
+                    backgroundColor: color,
+                    borderWidth: 2,
+                    tension: 0.1,
+                    spanGaps: true
+                };
+            });
 
             const ctxQuintenios = document.getElementById('chartQuintenios').getContext('2d');
             if (chartsInstance.quintenios) chartsInstance.quintenios.destroy();
 
             chartsInstance.quintenios = new Chart(ctxQuintenios, {
-                type: 'bar',
+                type: 'line',
                 data: {
-                    labels: qLabels,
-                    datasets: [{
-                        label: 'Nota Media del Quintenio',
-                        data: qMedias,
-                        backgroundColor: '#a371f7',
-                        borderColor: '#8957e5',
-                        borderWidth: 1
-                    }]
+                    labels: ['Año 1', 'Año 2', 'Año 3', 'Año 4', 'Año 5'],
+                    datasets: datasetsQuintenios
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { title: { display: true, text: 'Comparativa de Nota Media por Quintenios (Lustros)', color: '#c9d1d9', font: { size: 16 } } },
+                    plugins: { title: { display: true, text: 'Evolución de la Nota Media por Quintenios (Lustros)', color: '#c9d1d9', font: { size: 16 } } },
                     scales: {
                         y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e' } },
                         x: { grid: { color: '#21262d' }, ticks: { color: '#8b949e' } }
