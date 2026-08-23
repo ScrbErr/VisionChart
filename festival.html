@@ -29,6 +29,16 @@
         .back-link { display: inline-block; margin-bottom: 15px; color: #00d2ff; text-decoration: none; font-weight: bold; }
         .back-link:hover { text-decoration: underline; }
 
+        /* Estilo para los enlaces de los países en la tabla */
+        .country-link {
+            color: #fff;
+            text-decoration: none;
+        }
+        .country-link:hover {
+            color: #00d2ff;
+            text-decoration: underline;
+        }
+
         /* Contenedor con scroll horizontal y vertical más alto (Amplié max-height a 850px) */
         .table-container {
             overflow: auto;
@@ -243,7 +253,13 @@
                     const row = document.createElement('tr');
                     
                     const countryTd = document.createElement('td');
-                    countryTd.textContent = country;
+                    // Transformamos el nombre del país en un enlace interactivo hacia la futura página
+                    const countryLink = document.createElement('a');
+                    countryLink.href = `pais.html?nombre=${encodeURIComponent(country)}`;
+                    countryLink.textContent = country;
+                    countryLink.className = 'country-link';
+                    countryTd.appendChild(countryLink);
+                    
                     row.appendChild(countryTd);
 
                     years.forEach(year => {
