@@ -309,8 +309,17 @@
                                     if (!scoresMap[country]) scoresMap[country] = {};
                                     scoresMap[country][year] = { score: numericScore, date: spanishDate };
 
+                                    // Actualizar también en el array local scoresData para que las gráficas se refresquen bien
+                                    let existingScoreItem = scoresData.find(item => item.country === country && item.year === year);
+                                    if (existingScoreItem) {
+                                        existingScoreItem.score = numericScore;
+                                        existingScoreItem.date = spanishDate;
+                                    } else {
+                                        scoresData.push({ country, year, score: numericScore, date: spanishDate });
+                                    }
+
                                     // Recargar estadísticas y gráficas tras un cambio
-                                    actualizarEstadisticasYGraficas(years, countries, festivalMap, scoresMap, headerRow, tableFooter);
+                                    actualizarEstadisticasYGraficas(years, countries, festivalMap, scoresMap, headerRow, tableFooter, scoresData);
 
                                 } catch (err) {
                                     statusDiv.innerHTML = '❌ Error al guardar: ' + err.message;
@@ -336,7 +345,7 @@
                 });
 
                 // 3. Renderizar estadísticas en tabla y generar gráficas
-                actualizarEstadisticasYGraficas(years, countries, festivalMap, scoresMap, headerRow, tableFooter);
+                actualizarEstadisticasYGraficas(years, countries, festivalMap, scoresMap, headerRow, tableFooter, scoresData);
 
             } catch (error) {
                 statusDiv.innerHTML = '❌ Error al cargar el histórico: ' + error.message;
@@ -345,7 +354,7 @@
             }
         }
 
-        function actualizarEstadisticasYGraficas(years, countries, festivalMap, scoresMap, headerRow, tableFooter) {
+        function actualizarEstadisticasYGraficas(years, countries, festivalMap, scoresMap, headerRow, tableFooter, scoresData) {
             tableFooter.innerHTML = '';
 
             let statsPorAnio = {};
@@ -397,7 +406,7 @@
             });
 
             // Construir filas para el tfoot
-            const crearFilaStat = (label, key, isFloat = false) => {
+            const crearFilaStat = (label, key) => {
                 const tr = document.createElement('tr');
                 tr.className = 'stat-row';
                 const tdLabel = document.createElement('td');
