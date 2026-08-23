@@ -58,29 +58,30 @@
         const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1';
         const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
 
-        // 1. Capturar el parámetro 'nombre' de la URL (ej: pais.html?nombre=Espana)
+        // 1. Capturar y decodificar correctamente el parámetro 'nombre' de la URL
         const urlParams = new URLSearchParams(window.location.search);
-        const countryName = urlParams.get('nombre');
+        const rawCountryName = urlParams.get('nombre');
 
         async function cargarDatosPais() {
             const statusDiv = document.getElementById('status');
             const titleEl = document.getElementById('country-title');
             const subtitleEl = document.getElementById('country-subtitle');
 
-            if (!countryName) {
+            if (!rawCountryName) {
                 titleEl.textContent = "País no especificado";
                 statusDiv.textContent = "❌ No se ha indicado ningún país en la URL.";
                 statusDiv.style.color = '#f85149';
                 return;
             }
 
-            // Mostrar el nombre decodificado en la interfaz
-            const decodedCountry = decodeURIComponent(countryName);
+            // Decodificamos el nombre por si trae caracteres especiales o símbolos (&, tildes, etc.)
+            const decodedCountry = decodeURIComponent(rawCountryName);
+            
             titleEl.textContent = `🎵 ${decodedCountry}`;
             subtitleEl.textContent = `Evolución histórica de puntuaciones para ${decodedCountry}.`;
 
             try {
-                // 2. Consultar las puntuaciones de este país ordenadas por año
+                // 2. Consultar las puntuaciones de este país ordenadas por año usando el nombre exacto
                 const resScores = await fetch(`${SUPABASE_URL}/scores?country=eq.${encodeURIComponent(decodedCountry)}&order=year.asc`, {
                     headers: { 
                         'apikey': SUPABASE_ANON_KEY, 
