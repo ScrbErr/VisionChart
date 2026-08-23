@@ -163,6 +163,7 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
     
         let chartsInstance = {};
+        let scoresData = []; // <--- Declarada aquí de forma global para evitar el error
 
         async function cargarMatrizHistorica() {
             const statusDiv = document.getElementById('status');
@@ -201,7 +202,7 @@
                         'Range': '0-3000'
                     }
                 });
-                const scoresData = await resScores.json();
+                scoresData = await resScores.json(); // Asignación a la variable global
 
                 const years = [...new Set(scoresData.map(item => item.year))].sort((a, b) => a - b);
 
@@ -309,7 +310,7 @@
                                     if (!scoresMap[country]) scoresMap[country] = {};
                                     scoresMap[country][year] = { score: numericScore, date: spanishDate };
 
-                                    // Actualizar también en el array local scoresData para que las gráficas se refresquen bien
+                                    // Actualizar también en el array local scoresData
                                     let existingScoreItem = scoresData.find(item => item.country === country && item.year === year);
                                     if (existingScoreItem) {
                                         existingScoreItem.score = numericScore;
@@ -405,7 +406,6 @@
                 };
             });
 
-            // Construir filas para el tfoot
             const crearFilaStat = (label, key) => {
                 const tr = document.createElement('tr');
                 tr.className = 'stat-row';
@@ -429,12 +429,10 @@
             tableFooter.appendChild(crearFilaStat('👑 Notas ≥ 80', 'count80'));
             tableFooter.appendChild(crearFilaStat('📅 Última Actualización', 'ultimaFecha'));
 
-            // Generar Gráficas
             renderizarGraficas(years, statsPorAnio, scoresData);
         }
 
         function renderizarGraficas(years, statsPorAnio, scoresData) {
-            // 1. Gráfica de Evolución Anual (Promedio de notas)
             const ctxEvolucion = document.getElementById('chartEvolucionNotas').getContext('2d');
             if (chartsInstance.evolucion) chartsInstance.evolucion.destroy();
 
@@ -464,7 +462,6 @@
                 }
             });
 
-            // 2. Gráfica de Umbrales y Participantes por Año
             const ctxUmbrales = document.getElementById('chartUmbralesParticipantes').getContext('2d');
             if (chartsInstance.umbrales) chartsInstance.umbrales.destroy();
 
@@ -490,7 +487,6 @@
                 }
             });
 
-            // 3. Gráfica por Quintenios (ej. 2005-2009, 2010-2014...)
             const quinteniosMap = {};
             scoresData.forEach(s => {
                 if (s.score !== null && s.score !== undefined) {
