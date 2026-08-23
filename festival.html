@@ -29,9 +29,10 @@
         .back-link { display: inline-block; margin-bottom: 15px; color: #00d2ff; text-decoration: none; font-weight: bold; }
         .back-link:hover { text-decoration: underline; }
 
-        /* Contenedor sin scroll vertical, solo scroll horizontal si hace falta */
+        /* Contenedor con scroll horizontal y vertical, asegurando el funcionamiento sticky */
         .table-container {
-            overflow-x: auto;
+            overflow: auto;
+            max-height: 600px;
             margin-top: 15px;
             border-radius: 6px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.4);
@@ -39,6 +40,7 @@
         }
 
         table { width: 100%; border-collapse: collapse; background: #0d1117; }
+
         th, td { padding: 10px 15px; text-align: center; border-bottom: 1px solid #21262d; border-right: 1px solid #161b22; white-space: nowrap; }
         
         /* Primera columna fija (Sticky horizontalmente) */
@@ -57,7 +59,7 @@
             z-index: 3;
         }
 
-        /* Cabecera fija al hacer scroll en la página */
+        /* Cabecera fija al hacer scroll en la tabla */
         th { 
             background-color: #1f242c; 
             color: #00d2ff; 
@@ -132,6 +134,7 @@
 
     <div class="card">
         <h1>Histórico de Clasificaciones 🎵</h1>
+
         <p>Matriz de puntuaciones por país y año. Los países retirados o no participantes están bloqueados. Las estadísticas anuales se muestran al final de la tabla.</p>
         <div id="status">Conectando con la base de datos...</div>
         
@@ -153,6 +156,7 @@
 
     <div class="card">
         <h2>📈 Panel de Gráficas Analíticas</h2>
+
         <p>Visualización de la evolución histórica, distribución de notas por umbrales y rendimiento por quintenios.</p>
         
         <div class="charts-grid">
@@ -515,7 +519,7 @@
             const qLabelsOrder = Object.keys(quinteniosMap).sort();
             const palette = ['#1f77b4', '#d62728', '#bcbd22', '#2ca02c', '#ff7f0e', '#9467bd', '#8c564b'];
 
-            const datasetsQuintenios = qLabelsOrder.qMap((qLabel, index) => {}).map((qLabel, index) => {
+            const datasetsQuintenios = qLabelsOrder.map((qLabel, index) => {
                 const dataPoints = [1, 2, 3, 4, 5].map(anioNum => {
                     const arr = quinteniosMap[qLabel][anioNum];
                     if (arr && arr.length > 0) {
