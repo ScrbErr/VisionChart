@@ -3,23 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <title>Histórico de Clasificaciones - VisionChart</title>
+    <!-- Incluimos Chart.js para las gráficas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { 
             font-family: Arial, sans-serif; 
-            max-width: 1100px; 
+            max-width: 1200px; 
             margin: 40px auto; 
             padding: 0 20px; 
             background: #0d1117; 
             color: #c9d1d9; 
         }
-        h1 { color: #00d2ff; }
+        h1, h2 { color: #00d2ff; }
         p { color: #8b949e; }
         .card { 
             background: #161b22; 
             padding: 20px; 
             border-radius: 8px; 
             box-shadow: 0 4px 10px rgba(0,0,0,0.6); 
-            margin-bottom: 20px; 
+            margin-bottom: 25px; 
             border: 1px solid #30363d;
         }
         #status { font-weight: bold; margin-bottom: 15px; }
@@ -27,7 +29,7 @@
         .back-link { display: inline-block; margin-bottom: 15px; color: #00d2ff; text-decoration: none; font-weight: bold; }
         .back-link:hover { text-decoration: underline; }
 
-        /* Contenedor con scroll y celda fija */
+        /* Contenedor con scroll y celdas fijas */
         .table-container {
             max-height: 600px;
             overflow-y: auto;
@@ -61,6 +63,18 @@
         tr:hover { background-color: #161b22; }
         tr:hover td:first-child { background-color: #1f242c; }
 
+        /* Filas de estadísticas integradas al final de la tabla */
+        .stat-row td {
+            background-color: #121820;
+            color: #00d2ff;
+            font-weight: bold;
+            border-top: 2px solid #30363d;
+        }
+        .stat-row td:first-child {
+            background-color: #161b22;
+            color: #ff7b72;
+        }
+
         .score-input {
             width: 60px;
             background: #21262d;
@@ -85,34 +99,21 @@
             cursor: not-allowed;
         }
 
-        /* Estilos para la sección de estadísticas */
-        .stats-grid {
+        /* Contenedores para Gráficas */
+        .charts-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 15px;
+            grid-template-columns: 1fr;
+            gap: 25px;
             margin-top: 15px;
         }
-        .stat-card {
+        .chart-container {
             background: #0d1117;
             border: 1px solid #30363d;
             border-radius: 6px;
             padding: 15px;
+            position: relative;
+            height: 350px;
         }
-        .stat-card h3 {
-            margin-top: 0;
-            color: #00d2ff;
-            font-size: 16px;
-            border-bottom: 1px solid #21262d;
-            padding-bottom: 8px;
-        }
-        .stat-item {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 6px;
-            font-size: 14px;
-        }
-        .stat-label { color: #8b949e; }
-        .stat-value { font-weight: bold; color: #f0f6fc; }
     </style>
 </head>
 <body>
@@ -121,7 +122,7 @@
 
     <div class="card">
         <h1>Histórico de Clasificaciones 🎵</h1>
-        <p>Matriz de puntuaciones por país y año. Los países retirados o no participantes están bloqueados. La columna de países se mantiene fija al desplazar.</p>
+        <p>Matriz de puntuaciones por país y año. Los países retirados o no participantes están bloqueados. Las estadísticas anuales se muestran al final de la tabla.</p>
         <div id="status">Conectando con la base de datos...</div>
         
         <div class="table-container">
@@ -133,15 +134,27 @@
                 </thead>
                 <tbody id="table-body">
                 </tbody>
+                <tfoot id="table-footer">
+                    <!-- Aquí se inyectarán las filas de estadísticas -->
+                </tfoot>
             </table>
         </div>
     </div>
 
     <div class="card">
-        <h2>📊 Estadísticas Generales por Año</h2>
-        <p>Resumen analítico de las puntuaciones y participación registradas en cada edición.</p>
-        <div id="stats-container" class="stats-grid">
-            <div style="color: #8b949e;">Cargando estadísticas...</div>
+        <h2>📈 Panel de Gráficas Analíticas</h2>
+        <p>Visualización de la evolución histórica, distribución de notas por umbrales y rendimiento por quintenios.</p>
+        
+        <div class="charts-grid">
+            <div class="chart-container">
+                <canvas id="chartEvolucionNotas"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="chartUmbralesParticipantes"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="chartQuintenios"></canvas>
+            </div>
         </div>
     </div>
     
@@ -149,16 +162,22 @@
         const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1';
         const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
     
+        let chartsInstance = {};
+
         async function cargarMatrizHistorica() {
             const statusDiv = document.getElementById('status');
             const headerRow = document.getElementById('table-headers');
             const tableBody = document.getElementById('table-body');
-            const statsContainer = document.getElementById('stats-container');
+            const tableFooter = document.getElementById('table-footer');
             
             try {
-                // 1. Obtenemos los datos de la tabla festival
+                // 1. Obtenemos datos de la tabla festival
                 const resFestival = await fetch(`${SUPABASE_URL}/festival?select=*`, {
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+                    headers: { 
+                        'apikey': SUPABASE_ANON_KEY, 
+                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                        'Range': '0-3000'
+                    }
                 });
                 const festivalData = await resFestival.json();
 
@@ -176,7 +195,11 @@
 
                 // 2. Obtenemos los scores almacenados
                 const resScores = await fetch(`${SUPABASE_URL}/scores?select=*&order=date.asc`, {
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+                    headers: { 
+                        'apikey': SUPABASE_ANON_KEY, 
+                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                        'Range': '0-3000'
+                    }
                 });
                 const scoresData = await resScores.json();
 
@@ -286,8 +309,8 @@
                                     if (!scoresMap[country]) scoresMap[country] = {};
                                     scoresMap[country][year] = { score: numericScore, date: spanishDate };
 
-                                    // Recargar estadísticas dinámicamente tras un cambio
-                                    calcularYMostrarEstadisticas(years, countries, festivalMap, scoresMap);
+                                    // Recargar estadísticas y gráficas tras un cambio
+                                    actualizarEstadisticasYGraficas(years, countries, festivalMap, scoresMap, headerRow, tableFooter);
 
                                 } catch (err) {
                                     statusDiv.innerHTML = '❌ Error al guardar: ' + err.message;
@@ -312,8 +335,8 @@
                     tableBody.appendChild(row);
                 });
 
-                // 3. Generar estadísticas generales por año
-                calcularYMostrarEstadisticas(years, countries, festivalMap, scoresMap);
+                // 3. Renderizar estadísticas en tabla y generar gráficas
+                actualizarEstadisticasYGraficas(years, countries, festivalMap, scoresMap, headerRow, tableFooter);
 
             } catch (error) {
                 statusDiv.innerHTML = '❌ Error al cargar el histórico: ' + error.message;
@@ -322,9 +345,10 @@
             }
         }
 
-        function calcularYMostrarEstadisticas(years, countries, festivalMap, scoresMap) {
-            const statsContainer = document.getElementById('stats-container');
-            statsContainer.innerHTML = '';
+        function actualizarEstadisticasYGraficas(years, countries, festivalMap, scoresMap, headerRow, tableFooter) {
+            tableFooter.innerHTML = '';
+
+            let statsPorAnio = {};
 
             years.forEach(year => {
                 let participantes = 0;
@@ -361,19 +385,142 @@
 
                 const promedio = cuentaScoresValidos > 0 ? (sumaScores / cuentaScoresValidos).toFixed(1) : '0.0';
 
-                const card = document.createElement('div');
-                card.className = 'stat-card';
-                card.innerHTML = `
-                    <h3>Año ${year}</h3>
-                    <div class="stat-item"><span class="stat-label">Participantes:</span> <span class="stat-value">${participantes}</span></div>
-                    <div class="stat-item"><span class="stat-label">Suma Total Puntos:</span> <span class="stat-value">${sumaScores}</span></div>
-                    <div class="stat-item"><span class="stat-label">Promedio de Puntos:</span> <span class="stat-value">${promedio}</span></div>
-                    <div class="stat-item"><span class="stat-label">Notas ≥ 50:</span> <span class="stat-value">${count50}</span></div>
-                    <div class="stat-item"><span class="stat-label">Notas ≥ 70:</span> <span class="stat-value">${count70}</span></div>
-                    <div class="stat-item"><span class="stat-label">Notas ≥ 80:</span> <span class="stat-value">${count80}</span></div>
-                    <div class="stat-item"><span class="stat-label">Última Actualización:</span> <span class="stat-value">${ultimaFecha ? ultimaFecha : 'Sin registro'}</span></div>
-                `;
-                statsContainer.appendChild(card);
+                statsPorAnio[year] = {
+                    participantes,
+                    sumaScores,
+                    promedio: parseFloat(promedio),
+                    count50,
+                    count70,
+                    count80,
+                    ultimaFecha: ultimaFecha || 'Sin registro'
+                };
+            });
+
+            // Construir filas para el tfoot
+            const crearFilaStat = (label, key, isFloat = false) => {
+                const tr = document.createElement('tr');
+                tr.className = 'stat-row';
+                const tdLabel = document.createElement('td');
+                tdLabel.textContent = label;
+                tr.appendChild(tdLabel);
+
+                years.forEach(year => {
+                    const td = document.createElement('td');
+                    td.textContent = statsPorAnio[year][key];
+                    tr.appendChild(td);
+                });
+                return tr;
+            };
+
+            tableFooter.appendChild(crearFilaStat('👥 Participantes', 'participantes'));
+            tableFooter.appendChild(crearFilaStat('➕ Suma Puntuaciones', 'sumaScores'));
+            tableFooter.appendChild(crearFilaStat('⭐ Promedio Puntos', 'promedio'));
+            tableFooter.appendChild(crearFilaStat('🎯 Notas ≥ 50', 'count50'));
+            tableFooter.appendChild(crearFilaStat('🔥 Notas ≥ 70', 'count70'));
+            tableFooter.appendChild(crearFilaStat('👑 Notas ≥ 80', 'count80'));
+            tableFooter.appendChild(crearFilaStat('📅 Última Actualización', 'ultimaFecha'));
+
+            // Generar Gráficas
+            renderizarGraficas(years, statsPorAnio, scoresData);
+        }
+
+        function renderizarGraficas(years, statsPorAnio, scoresData) {
+            // 1. Gráfica de Evolución Anual (Promedio de notas)
+            const ctxEvolucion = document.getElementById('chartEvolucionNotas').getContext('2d');
+            if (chartsInstance.evolucion) chartsInstance.evolucion.destroy();
+
+            const promedios = years.map(y => statsPorAnio[y].promedio);
+            chartsInstance.evolucion = new Chart(ctxEvolucion, {
+                type: 'line',
+                data: {
+                    labels: years,
+                    datasets: [{
+                        label: 'Promedio de Puntuación Anual',
+                        data: promedios,
+                        borderColor: '#00d2ff',
+                        backgroundColor: 'rgba(0, 210, 255, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { title: { display: true, text: 'Evolución de la Nota Media por Año', color: '#c9d1d9', font: { size: 16 } } },
+                    scales: {
+                        y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e' } },
+                        x: { grid: { color: '#21262d' }, ticks: { color: '#8b949e' } }
+                    }
+                }
+            });
+
+            // 2. Gráfica de Umbrales y Participantes por Año
+            const ctxUmbrales = document.getElementById('chartUmbralesParticipantes').getContext('2d');
+            if (chartsInstance.umbrales) chartsInstance.umbrales.destroy();
+
+            chartsInstance.umbrales = new Chart(ctxUmbrales, {
+                type: 'bar',
+                data: {
+                    labels: years,
+                    datasets: [
+                        { label: 'Participantes', data: years.map(y => statsPorAnio[y].participantes), backgroundColor: '#8b949e' },
+                        { label: 'Notas ≥ 50', data: years.map(y => statsPorAnio[y].count50), backgroundColor: '#3fb950' },
+                        { label: 'Notas ≥ 70', data: years.map(y => statsPorAnio[y].count70), backgroundColor: '#d29922' },
+                        { label: 'Notas ≥ 80', data: years.map(y => statsPorAnio[y].count80), backgroundColor: '#f85149' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { title: { display: true, text: 'Participantes y Distribución de Notas por Umbral', color: '#c9d1d9', font: { size: 16 } } },
+                    scales: {
+                        y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e' } },
+                        x: { grid: { color: '#21262d' }, ticks: { color: '#8b949e' } }
+                    }
+                }
+            });
+
+            // 3. Gráfica por Quintenios (ej. 2005-2009, 2010-2014...)
+            const quinteniosMap = {};
+            scoresData.forEach(s => {
+                if (s.score !== null && s.score !== undefined) {
+                    const qStart = Math.floor(s.year / 5) * 5;
+                    const qEnd = qStart + 4;
+                    const qLabel = `${qStart}-${qEnd}`;
+                    if (!quinteniosMap[qLabel]) quinteniosMap[qLabel] = { suma: 0, count: 0 };
+                    quinteniosMap[qLabel].suma += s.score;
+                    quinteniosMap[qLabel].count++;
+                }
+            });
+
+            const qLabels = Object.keys(quinteniosMap).sort();
+            const qMedias = qLabels.map(q => (quinteniosMap[q].suma / quinteniosMap[q].count).toFixed(1));
+
+            const ctxQuintenios = document.getElementById('chartQuintenios').getContext('2d');
+            if (chartsInstance.quintenios) chartsInstance.quintenios.destroy();
+
+            chartsInstance.quintenios = new Chart(ctxQuintenios, {
+                type: 'bar',
+                data: {
+                    labels: qLabels,
+                    datasets: [{
+                        label: 'Nota Media del Quintenio',
+                        data: qMedias,
+                        backgroundColor: '#a371f7',
+                        borderColor: '#8957e5',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { title: { display: true, text: 'Comparativa de Nota Media por Quintenios (Lustros)', color: '#c9d1d9', font: { size: 16 } } },
+                    scales: {
+                        y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e' } },
+                        x: { grid: { color: '#21262d' }, ticks: { color: '#8b949e' } }
+                    }
+                }
             });
         }
 
