@@ -27,11 +27,39 @@
         .back-link { display: inline-block; margin-bottom: 15px; color: #00d2ff; text-decoration: none; font-weight: bold; }
         .back-link:hover { text-decoration: underline; }
 
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #0d1117; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
-        th, td { padding: 10px 15px; text-align: center; border-bottom: 1px solid #21262d; border-right: 1px solid #161b22; }
-        th:first-child, td:first-child { text-align: left; font-weight: bold; color: #fff; }
-        th { background-color: #1f242c; color: #00d2ff; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px; border-bottom: 2px solid #00d2ff; }
+        /* Contenedor con scroll y celda fija */
+        .table-container {
+            max-height: 600px;
+            overflow-y: auto;
+            overflow-x: auto;
+            margin-top: 15px;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+            border: 1px solid #30363d;
+        }
+
+        table { width: 100%; border-collapse: collapse; background: #0d1117; }
+        th, td { padding: 10px 15px; text-align: center; border-bottom: 1px solid #21262d; border-right: 1px solid #161b22; white-space: nowrap; }
+        
+        /* Primera columna fija (Sticky) */
+        th:first-child, td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background-color: #161b22;
+            text-align: left;
+            font-weight: bold;
+            color: #fff;
+            border-right: 2px solid #30363d;
+        }
+        th:first-child {
+            background-color: #1f242c;
+            z-index: 3;
+        }
+
+        th { background-color: #1f242c; color: #00d2ff; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px; border-bottom: 2px solid #00d2ff; position: sticky; top: 0; z-index: 1; }
         tr:hover { background-color: #161b22; }
+        tr:hover td:first-child { background-color: #1f242c; }
 
         .score-input {
             width: 60px;
@@ -56,6 +84,35 @@
             border-color: #21262d;
             cursor: not-allowed;
         }
+
+        /* Estilos para la sección de estadísticas */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .stat-card {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+        }
+        .stat-card h3 {
+            margin-top: 0;
+            color: #00d2ff;
+            font-size: 16px;
+            border-bottom: 1px solid #21262d;
+            padding-bottom: 8px;
+        }
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+        .stat-label { color: #8b949e; }
+        .stat-value { font-weight: bold; color: #f0f6fc; }
     </style>
 </head>
 <body>
@@ -64,10 +121,10 @@
 
     <div class="card">
         <h1>Histórico de Clasificaciones 🎵</h1>
-        <p>Matriz de puntuaciones por país y año. Los países retirados o no participantes están bloqueados.</p>
+        <p>Matriz de puntuaciones por país y año. Los países retirados o no participantes están bloqueados. La columna de países se mantiene fija al desplazar.</p>
         <div id="status">Conectando con la base de datos...</div>
         
-        <div style="overflow-x: auto;">
+        <div class="table-container">
             <table id="matrix-table">
                 <thead>
                     <tr id="table-headers">
@@ -79,6 +136,14 @@
             </table>
         </div>
     </div>
+
+    <div class="card">
+        <h2>📊 Estadísticas Generales por Año</h2>
+        <p>Resumen analítico de las puntuaciones y participación registradas en cada edición.</p>
+        <div id="stats-container" class="stats-grid">
+            <div style="color: #8b949e;">Cargando estadísticas...</div>
+        </div>
+    </div>
     
     <script>
         const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1';
@@ -88,6 +153,7 @@
             const statusDiv = document.getElementById('status');
             const headerRow = document.getElementById('table-headers');
             const tableBody = document.getElementById('table-body');
+            const statsContainer = document.getElementById('stats-container');
             
             try {
                 // 1. Obtenemos los datos de la tabla festival
@@ -96,7 +162,6 @@
                 });
                 const festivalData = await resFestival.json();
 
-                // Estructura segura: participacionMap[country][year] = { id, withdrawn }
                 const festivalMap = {};
                 festivalData.forEach(item => {
                     const fYear = item.year || 2026;
@@ -134,7 +199,7 @@
                 const scoresMap = {};
                 scoresData.forEach(s => {
                     if (!scoresMap[s.country]) scoresMap[s.country] = {};
-                    scoresMap[s.country][s.year] = s.score;
+                    scoresMap[s.country][s.year] = { score: s.score, date: s.date };
                 });
 
                 tableBody.innerHTML = '';
@@ -148,7 +213,6 @@
                     years.forEach(year => {
                         const td = document.createElement('td');
                         
-                        // Verificamos si existe registro para este año y si está retirado
                         const festivalInfo = festivalMap[country] && festivalMap[country][year];
                         const isWithdrawn = !festivalInfo || festivalInfo.withdrawn;
 
@@ -156,11 +220,13 @@
                         input.type = 'text';
                         input.className = 'score-input';
 
+                        const scoreObj = scoresMap[country] && scoresMap[country][year];
+                        const score = scoreObj ? scoreObj.score : undefined;
+
                         if (isWithdrawn) {
                             input.value = '-';
-                            input.disabled = true; // Bloqueado estrictamente si no participa o está withdrawn
+                            input.disabled = true;
                         } else {
-                            const score = scoresMap[country] ? scoresMap[country][year] : undefined;
                             input.value = (score !== undefined && score !== null) ? score : '-';
 
                             const guardarCambio = async () => {
@@ -186,14 +252,12 @@
                                 const yearDate = parts.find(p => p.type === 'year').value;
                                 const spanishDate = `${yearDate}-${month}-${day}`;
 
-                                // Obtenemos el ID correcto desde el mapa de festival
                                 const countryId = festivalInfo.id;
 
                                 statusDiv.innerHTML = '⏳ Guardando en BBDD...';
                                 statusDiv.style.color = '#d29922';
 
                                 try {
-                                    // Petición robusta asegurando la cabecera on_conflict para Supabase
                                     const response = await fetch(`${SUPABASE_URL}/scores`, {
                                         method: 'POST',
                                         headers: {
@@ -220,7 +284,10 @@
                                     statusDiv.style.color = '#3fb950';
                                     
                                     if (!scoresMap[country]) scoresMap[country] = {};
-                                    scoresMap[country][year] = numericScore;
+                                    scoresMap[country][year] = { score: numericScore, date: spanishDate };
+
+                                    // Recargar estadísticas dinámicamente tras un cambio
+                                    calcularYMostrarEstadisticas(years, countries, festivalMap, scoresMap);
 
                                 } catch (err) {
                                     statusDiv.innerHTML = '❌ Error al guardar: ' + err.message;
@@ -245,11 +312,69 @@
                     tableBody.appendChild(row);
                 });
 
+                // 3. Generar estadísticas generales por año
+                calcularYMostrarEstadisticas(years, countries, festivalMap, scoresMap);
+
             } catch (error) {
                 statusDiv.innerHTML = '❌ Error al cargar el histórico: ' + error.message;
                 statusDiv.style.color = '#f85149';
                 console.error('Error detallado:', error);
             }
+        }
+
+        function calcularYMostrarEstadisticas(years, countries, festivalMap, scoresMap) {
+            const statsContainer = document.getElementById('stats-container');
+            statsContainer.innerHTML = '';
+
+            years.forEach(year => {
+                let participantes = 0;
+                let sumaScores = 0;
+                let cuentaScoresValidos = 0;
+                let count50 = 0;
+                let count70 = 0;
+                let count80 = 0;
+                let ultimaFecha = null;
+
+                countries.forEach(country => {
+                    const festivalInfo = festivalMap[country] && festivalMap[country][year];
+                    const isWithdrawn = !festivalInfo || festivalInfo.withdrawn;
+
+                    if (!isWithdrawn) {
+                        participantes++;
+                        const scoreObj = scoresMap[country] && scoresMap[country][year];
+                        if (scoreObj && scoreObj.score !== undefined && scoreObj.score !== null) {
+                            const sc = scoreObj.score;
+                            sumaScores += sc;
+                            cuentaScoresValidos++;
+                            if (sc >= 50) count50++;
+                            if (sc >= 70) count70++;
+                            if (sc >= 80) count80++;
+
+                            if (scoreObj.date) {
+                                if (!ultimaFecha || scoreObj.date > ultimaFecha) {
+                                    ultimaFecha = scoreObj.date;
+                                }
+                            }
+                        }
+                    }
+                });
+
+                const promedio = cuentaScoresValidos > 0 ? (sumaScores / cuentaScoresValidos).toFixed(1) : '0.0';
+
+                const card = document.createElement('div');
+                card.className = 'stat-card';
+                card.innerHTML = `
+                    <h3>Año ${year}</h3>
+                    <div class="stat-item"><span class="stat-label">Participantes:</span> <span class="stat-value">${participantes}</span></div>
+                    <div class="stat-item"><span class="stat-label">Suma Total Puntos:</span> <span class="stat-value">${sumaScores}</span></div>
+                    <div class="stat-item"><span class="stat-label">Promedio de Puntos:</span> <span class="stat-value">${promedio}</span></div>
+                    <div class="stat-item"><span class="stat-label">Notas ≥ 50:</span> <span class="stat-value">${count50}</span></div>
+                    <div class="stat-item"><span class="stat-label">Notas ≥ 70:</span> <span class="stat-value">${count70}</span></div>
+                    <div class="stat-item"><span class="stat-label">Notas ≥ 80:</span> <span class="stat-value">${count80}</span></div>
+                    <div class="stat-item"><span class="stat-label">Última Actualización:</span> <span class="stat-value">${ultimaFecha ? ultimaFecha : 'Sin registro'}</span></div>
+                `;
+                statsContainer.appendChild(card);
+            });
         }
 
         cargarMatrizHistorica();
