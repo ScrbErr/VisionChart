@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Detalle de País - VisionChart</title>
+    <!-- Incluimos Chart.js para la gráfica -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 900px; 
+            margin: 40px auto; 
+            padding: 0 20px; 
+            background: #0d1117; 
+            color: #c9d1d9; 
+        }
+        h1 { color: #00d2ff; margin-bottom: 5px; }
+        p { color: #8b949e; }
+        .card { 
+            background: #161b22; 
+            padding: 25px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.6); 
+            margin-bottom: 25px; 
+            border: 1px solid #30363d;
+        }
+        .back-link { display: inline-block; margin-bottom: 15px; color: #00d2ff; text-decoration: none; font-weight: bold; }
+        .back-link:hover { text-decoration: underline; }
+        #status { font-weight: bold; margin-bottom: 15px; }
+
+        .chart-container {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            position: relative;
+            height: 400px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <a href="historico.html" class="back-link">← Volver al Histórico</a>
+
+    <div class="card">
+        <h1 id="country-title">Cargando país...</h1>
+        <p id="country-subtitle">Histórico de puntuaciones individuales.</p>
+        
+        <div id="status">Conectando con la base de datos...</div>
+
+        <div class="chart-container">
+            <canvas id="chartCountryScores"></canvas>
+        </div>
+    </div>
+    
+    <script>
+        const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1';
+        const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
+
+        // 1. Capturar el parámetro 'nombre' de la URL (ej: pais.html?nombre=Espana)
+        const urlParams = new URLSearchParams(window.location.search);
+        const countryName = urlParams.get('nombre');
+
+        async function cargarDatosPais() {
+            const statusDiv = document.getElementById('status');
+            const titleEl = document.getElementById('country-title');
+            const subtitleEl = document.getElementById('country-subtitle');
+
+            if (!countryName) {
+                titleEl.textContent = "País no especificado";
+                statusDiv.textContent = "❌ No se ha indicado ningún país en la URL.";
+                statusDiv.style.color = '#f85149';
+                return;
+            }
+
+            // Mostrar el nombre decodificado en la interfaz
+            const decodedCountry = decodeURIComponent(countryName);
+            titleEl.textContent = `🎵 ${decodedCountry}`;
+            subtitleEl.textContent = `Evolución histórica de puntuaciones para ${decodedCountry}.`;
+
+            try {
+                // 2. Consultar las puntuaciones de este país ordenadas por año
+                const resScores = await fetch(`${SUPABASE_URL}/scores?country=eq.${encodeURIComponent(decodedCountry)}&order=year.asc`, {
+                    headers: { 
+                        'apikey': SUPABASE_ANON_KEY, 
+                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+                    }
+                });
+
+                if (!resScores.ok) {
+                    throw new Error('Error al conectar con la base de datos de puntuaciones.');
+                }
+
+                const scoresData = await resScores.json();
+
+                if (scoresData.length === 0) {
+                    statusDiv.textContent = `⚠️ No se encontraron registros de puntuación para ${decodedCountry}.`;
+                    statusDiv.style.color = '#d29922';
+                    return;
+                }
+
+                statusDiv.textContent = `✅ Datos cargados correctamente (${scoresData.length} registros).`;
+                statusDiv.style.color = '#3fb950';
+
+                // 3. Preparar datos para la gráfica
+                const years = scoresData.map(item => item.year);
+                const scores = scoresData.map(item => item.score);
+
+                renderizarGraficaPais(years, scores, decodedCountry);
+
+            } catch (error) {
+                statusDiv.textContent = '❌ Error: ' + error.message;
+                statusDiv.style.color = '#f85149';
+                console.error('Detalle:', error);
+            }
+        }
+
+        function renderizarGraficaPais(years, scores, countryName) {
+            const ctx = document.getElementById('chartCountryScores').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: years,
+                    datasets: [{
+                        label: `Puntuación de ${countryName}`,
+                        data: scores,
+                        borderColor: '#00d2ff',
+                        backgroundColor: 'rgba(0, 210, 255, 0.15)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        title: { 
+                            display: true, 
+                            text: `Evolución de Puntuaciones - ${countryName}`, 
+                            color: '#c9d1d9', 
+                            font: { size: 16 } 
+                        } 
+                    },
+                    scales: {
+                        y: { 
+                            min: 0, 
+                            max: 100, 
+                            grid: { color: '#21262d' }, 
+                            ticks: { color: '#8b949e' } 
+                        },
+                        x: { 
+                            grid: { color: '#21262d' }, 
+                            ticks: { color: '#8b949e' } 
+                        }
+                    }
+                }
+            });
+        }
+
+        cargarDatosPais();
+    </script>
+
+</body>
+</html>
