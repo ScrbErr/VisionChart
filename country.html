@@ -7,14 +7,12 @@
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f6f9; color: #333; }
         h1 { text-align: center; color: #2c3e50; }
         
-        /* Controles superiores */
         .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: #fff; padding: 12px 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .btn { padding: 8px 15px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 14px; }
         .btn-save { background-color: #27ae60; color: white; transition: all 0.3s ease; }
         .btn-undo { background-color: #e74c3c; color: white; display: none; margin-left: 10px; }
         .btn-export { background-color: #2980b9; color: white; }
 
-        /* Animación de pulso para cambios pendientes */
         @keyframes pulse-warning {
             0% { background-color: #f39c12; transform: scale(1); }
             50% { background-color: #f1c40f; transform: scale(1.05); }
@@ -22,16 +20,13 @@
         }
         .pulse-active { animation: pulse-warning 1s infinite; }
 
-        /* Contenedor de la tabla con scroll fluido */
         .table-container { max-height: 70vh; overflow: auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         table { width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; white-space: nowrap; }
         th, td { border: 1px solid #dcdde1; padding: 8px; background-color: #ffffff; }
         
-        /* Cabeceras fijas */
         th { background-color: #2c3e50; color: white; position: sticky; top: 0; z-index: 10; padding: 10px 6px; }
         .year-col { position: sticky; left: 0; background-color: #34495e !important; color: white; z-index: 5; font-weight: bold; text-align: center; }
 
-        /* Celdas e Inputs */
         input.rank-input { width: 45px; text-align: center; border: 1px solid #b2bec3; padding: 5px; border-radius: 3px; font-size: 13px; background-color: #fff; color: #2d3436; }
         input.rank-input:focus { outline: none; border-color: #0984e3; box-shadow: 0 0 3px rgba(9,132,227,0.5); }
         
@@ -62,13 +57,12 @@
                 </tr>
             </thead>
             <tbody id="table-body">
-                <!-- Se rellena dinámicamente -->
+                <!-- Dinámico -->
             </tbody>
         </table>
     </div>
 
     <script>
-        // Configuración de Supabase (asegúrate de mantener tus credenciales)
         const SUPABASE_URL = "TU_SUPABASE_URL";
         const SUPABASE_KEY = "TU_SUPABASE_ANON_KEY";
 
@@ -77,7 +71,6 @@
         let countriesList = [];
         let yearsList = [];
 
-        // Diccionario de códigos ISO para banderas (puedes ampliarlo)
         const countryCodes = {
             "Albania": "al", "Armenia": "am", "Australia": "au", "Austria": "at", 
             "Azerbaijan": "az", "Belarus": "by", "Belgium": "be", "Bulgaria": "bg",
@@ -87,33 +80,58 @@
 
         async function loadMatrixData() {
             try {
-                // Consulta a la tabla correcta: country_rankings
-                const response = await fetch(`${SUPABASE_URL}/rest/v1/country_rankings?select=*`, {
-                    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
-                });
-                const rows = await response.json();
+                // Consultamos ambas tablas en paralelo
+                const [rankingsRes, festivalRes] = await Promise.all([
+                    fetch(`${SUPABASE_URL}/rest/v1/country_rankings?select=*`, {
+                        headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
+                    }),
+                    fetch(`${SUPABASE_URL}/rest/v1/festival?select=year,country,withdrawn`, {
+                        headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
+                    })
+                ]);
 
-                processRows(rows);
+                const rankingsRows = await rankingsRes.json();
+                const festivalRows = await festivalRes.json();
+
+                processData(rankingsRows, festivalRows);
                 renderTable();
             } catch (error) {
                 console.error("Error al cargar los datos de Supabase:", error);
             }
         }
 
-        function processRows(rows) {
+        function processData(rankings, festivals) {
             const yearsSet = new Set();
             const countriesSet = new Set();
+            const withdrawnMap = {};
 
-            rows.forEach(row => {
-                yearsSet.add(row.year);
-                countriesSet.add(row.country);
-                // Clave compuesta: año y país
-                const key = `${row.year}-${row.country}`;
-                originalData[key] = row.position !== null ? String(row.position) : "-";
-                currentData[key] = row.position !== null ? String(row.position) : "-";
+            // Mapear retiradas desde la tabla festival (clave: "year-country")
+            festivals.forEach(f => {
+                if (f.withdrawn) {
+                    withdrawnMap[`${f.year}-${f.country}`] = true;
+                }
             });
 
-            // Ordenar años de forma descendente y países alfabéticamente
+            rankings.forEach(row => {
+                yearsSet.add(row.year);
+                countriesSet.add(row.country);
+                
+                const key = `${row.year}-${row.country}`;
+                let displayVal = "";
+
+                // Si está marcado como withdrawn en la tabla festival, ponemos "//"
+                if (withdrawnMap[key]) {
+                    displayVal = "//";
+                } else if (row.position !== null && row.position !== undefined) {
+                    displayVal = String(row.position);
+                } else {
+                    displayVal = "-";
+                }
+
+                originalData[key] = displayVal;
+                currentData[key] = displayVal;
+            });
+
             yearsList = Array.from(yearsSet).sort((a, b) => b - a);
             countriesList = Array.from(countriesSet).sort();
         }
@@ -122,7 +140,7 @@
             const headerRow = document.getElementById("table-headers");
             const tBody = document.getElementById("table-body");
 
-            // 1. Crear cabeceras de columnas con los Países y sus banderas
+            // 1. Cabeceras con Países y Banderas
             let headerHTML = "<th>Año</th>";
             countriesList.forEach(country => {
                 const code = countryCodes[country];
@@ -131,7 +149,7 @@
             });
             headerRow.innerHTML = headerHTML;
 
-            // 2. Crear filas con los Años en el lateral izquierdo
+            // 2. Filas con Años en el lateral
             let bodyHTML = "";
             yearsList.forEach(year => {
                 bodyHTML += `<tr><td class="year-col">${year}</td>`;
@@ -212,10 +230,14 @@
             for (let key in currentData) {
                 if (currentData[key] !== originalData[key]) {
                     const [year, country] = key.split("-");
+                    const val = currentData[key];
+                    // Si es "//", guardamos null o manejamos según requiera country_rankings, de lo contrario convertimos a entero
+                    const positionVal = (val === "//" || val === "-") ? null : parseInt(val);
+
                     upserts.push({ 
                         year: parseInt(year), 
                         country: country, 
-                        position: currentData[key] 
+                        position: positionVal 
                     });
                 }
             }
@@ -223,7 +245,7 @@
             if (upserts.length === 0) return;
 
             try {
-                // Guardar cambios en la tabla country_rankings mediante upsert
+                // Actualizamos la tabla country_rankings
                 const response = await fetch(`${SUPABASE_URL}/rest/v1/country_rankings`, {
                     method: "POST",
                     headers: {
@@ -264,7 +286,6 @@
             link.click();
         }
 
-        // Cargar los datos al iniciar
         loadMatrixData();
     </script>
 </body>
