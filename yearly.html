@@ -19,8 +19,8 @@
 
         .table-container {
             max-width: 100%;
-            overflow-x: auto;
-            max-height: 80vh;
+            overflow: auto;
+            max-height: 75vh;
             border: 1px solid #30363d;
             border-radius: 8px;
             background: #161b22;
@@ -54,17 +54,18 @@
         }
 
         th:first-child {
-            z-index: 4;
+            z-index: 5;
             background-color: #1f242c;
             cursor: pointer;
         }
 
+        /* Cabecera superior fija */
         th {
             background-color: #1f242c;
             color: #00d2ff;
             position: sticky;
             top: 0;
-            z-index: 2;
+            z-index: 4;
             cursor: pointer;
             user-select: none;
         }
@@ -72,7 +73,7 @@
             background-color: #30363d;
         }
 
-        /* Clases de colores según la posición (inspirado en tu imagen) */
+        /* Clases de colores según la posición */
         .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; } /* Oro */
         .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; } /* Plata */
         .pos-3 { background-color: #cd7f32 !important; color: #000 !important; font-weight: bold; } /* Bronce */
@@ -97,13 +98,13 @@
     <h1>Matriz de Posiciones por Festival</h1>
     <p class="subtitle">Evolución histórica de puestos obtenidos por año.</p>
 
-    <div id="status">Cargando datos de posiciones...</div>
+    <div id="status">Cargando datos de Supabase...</div>
 
     <div class="table-container">
         <table id="yearlyTable">
             <thead>
                 <tr id="table-headers">
-                    <th>Países ↕</th>
+                    <th onclick="ordenarColumna(0)">Países ↕</th>
                 </tr>
             </thead>
             <tbody id="table-body">
@@ -116,29 +117,29 @@
         const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1';
         const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
 
-        async function cargarMatrizPosiciones() {
+        async function cargarDatos() {
             const statusDiv = document.getElementById('status');
             
             try {
-                // Hacemos fetch a la tabla de scores o festival (asumiendo que guardas el ranking/posición aquí o adaptándolo)
-                // Nota: Si tus posiciones están en la misma tabla 'scores' u otra, ajustamos el endpoint. 
-                // Aquí simularemos la estructura cruzando país y año.
-                const res = await fetch(`${SUPABASE_URL}/yearly_rankings?select=country,year,score&order=year.asc`, {
-                    headers: { 
-                        'apikey': SUPABASE_ANON_KEY, 
-                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
-                    }
-                });
+                // Descargamos en paralelo las tablas 'yearly_rankings' y 'festival'
+                const [resRankings, resFestival] = await Promise.all([
+                    fetch(`${SUPABASE_URL}/yearly_rankings?select=country,year,rank`, {
+                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+                    }),
+                    fetch(`${SUPABASE_URL}/festival?select=country,year,withdrawn`, {
+                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+                    })
+                ]);
 
-                if (!res.ok) throw new Error('Error al conectar con la base de datos.');
+                if (!resRankings.ok || !resFestival.ok) throw new Error('Error al conectar con Supabase.');
 
-                const data = await res.json();
+                const rankings = await resRankings.json();
+                const festival = await resFestival.json();
                 
                 statusDiv.textContent = "✅ Matriz cargada con éxito.";
                 statusDiv.style.color = '#3fb950';
 
-                // Aquí procesaremos los datos para construir la tabla cruzada filas (países) y columnas (años)
-                construirTabla(data);
+                construirMatriz(rankings, festival);
 
             } catch (error) {
                 statusDiv.textContent = '❌ Error: ' + error.message;
@@ -147,8 +148,94 @@
             }
         }
 
+        let currentSortColumn = -1;
+        let sortDirection = false; // false = asc, true = desc
+
+        function construirMatriz(rankings, festival) {
+            // 1. Extraer listas únicas de países y años ordenados
+            const paisesSet = new Set();
+            const anosSet = new Set();
+
+            rankings.forEach(r => {
+                if (r.country) paisesSet.add(r.country);
+                if (r.year) anosSet.add(r.year);
+            });
+
+            const paises = Array.from(paisesSet).sort();
+            const anos = Array.from(anosSet).sort((a, b) => a - b);
+
+            // 2. Mapear datos para acceso rápido: mapa[pais][año] = rank
+            const matriz = {};
+            paises.forEach(p => matriz[p] = {});
+
+            rankings.forEach(r => {
+                if (r.country && r.year) {
+                    matriz[r.country][r.year] = r.rank;
+                }
+            });
+
+            // 3. Mapear retiradas: retiradas[pais][año] = true/false
+            const retiradas = {};
+            festival.forEach(f => {
+                if (f.country && f.year) {
+                    if (!retiradas[f.country]) retiradas[f.country] = {};
+                    retiradas[f.country][f.year] = f.withdrawn;
+                }
+            });
+
+            // 4. Calcular el número máximo de participantes (o peor rango) por año para los últimos 5
+            const maxRangoPorAnio = {};
+            anos.forEach(ano => {
+                let maxR = 0;
+                paises.forEach(p => {
+                    let r = matriz[p][ano];
+                    if (r && r > maxR) maxR = r;
+                });
+                maxRangoPorAnio[ano] = maxR;
+            });
+
+            // 5. Pintar Cabeceras de Años
+            const trHeaders = document.getElementById('table-headers');
+            trHeaders.innerHTML = '<th onclick="ordenarColumna(0)">Países ↕</th>';
+            anos.forEach((ano, index) => {
+                trHeaders.innerHTML += `<th onclick="ordenarColumna(${index + 1})">${ano} ↕</th>`;
+            });
+
+            // Guardar datos globales para la ordenación
+            window.tablaData = { paises, anos, matriz, retiradas, maxRangoPorAnio };
+            renderizarCuerpo(paises, anos, matriz, retiradas, maxRangoPorAnio);
+        }
+
+        function renderizarCuerpo(paises, anos, matriz, retiradas, maxRangoPorAnio) {
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+
+            paises.forEach(pais => {
+                let tr = document.createElement('tr');
+                let tdPais = document.createElement('td');
+                tdPais.textContent = pais;
+                tr.appendChild(tdPais);
+
+                anos.forEach(ano => {
+                    let td = document.createElement('td');
+                    let rank = matriz[pais][ano];
+                    let isWithdrawn = retiradas[pais] && retiradas[pais][ano] === true;
+                    let maxR = maxRangoPorAnio[ano] || 25;
+
+                    if (isWithdrawn || rank === null || rank === undefined || isNaN(rank)) {
+                        td.textContent = '//';
+                        td.className = 'pos-none';
+                    } else {
+                        td.textContent = rank;
+                        td.className = obtenerClasePosicion(rank, maxR);
+                    }
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
         function obtenerClasePosicion(pos, totalParticipantesAnio) {
-            if (pos === null || pos === undefined || isNaN(pos)) return 'pos-none';
             if (pos === 1) return 'pos-1';
             if (pos === 2) return 'pos-2';
             if (pos === 3) return 'pos-3';
@@ -156,19 +243,41 @@
             if (pos >= 6 && pos <= 10) return 'pos-green-mid';
             if (pos >= 11 && pos <= 26) return 'pos-green-light';
             if (pos >= 27 && pos <= 30) return 'pos-orange-light';
-            
-            // Si está entre los últimos 5 del año
             if (pos >= totalParticipantesAnio - 4) return 'pos-orange-strong';
-            
             return 'pos-orange-std';
         }
 
-        function construirTabla(data) {
-            // Lógica preliminar de estructuración por país y año para pintar la tabla cruzada
-            // ...
+        // Función de ordenación al hacer clic en las columnas
+        function ordenarColumna(colIndex) {
+            const { paises, anos, matriz, retiradas, maxRangoPorAnio } = window.tablaData;
+            
+            if (currentSortColumn === colIndex) {
+                sortDirection = !sortDirection; // Invertir orden
+            } else {
+                currentSortColumn = colIndex;
+                sortDirection = false;
+            }
+
+            paises.sort((a, b) => {
+                let valA, valB;
+                if (colIndex === 0) {
+                    valA = a;
+                    valB = b;
+                } else {
+                    let ano = anos[colIndex - 1];
+                    valA = matriz[a][ano] !== undefined ? matriz[a][ano] : 9999;
+                    valB = matriz[b][ano] !== undefined ? matriz[b][ano] : 9999;
+                }
+
+                if (valA < valB) return sortDirection ? 1 : -1;
+                if (valA > valB) return sortDirection ? -1 : 1;
+                return 0;
+            });
+
+            renderizarCuerpo(paises, anos, matriz, retiradas, maxRangoPorAnio);
         }
 
-        cargarMatrizPosiciones();
+        cargarDatos();
     </script>
 
 </body>
