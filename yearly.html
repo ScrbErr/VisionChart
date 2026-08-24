@@ -74,7 +74,6 @@
             background-color: #30363d;
         }
 
-        /* Estilo para la fecha pequeña dentro del th de cada año */
         .th-date {
             display: block;
             font-size: 10px;
@@ -84,22 +83,20 @@
         }
 
         /* Clases de colores según la posición */
-        .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; } /* Oro */
-        .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; } /* Plata */
-        .pos-3 { background-color: #e08a1e !important; color: #000 !important; font-weight: bold; } /* Bronce */
+        .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; }
+        .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; }
+        .pos-3 { background-color: #e08a1e !important; color: #000 !important; font-weight: bold; }
         
-        .pos-green-dark { background-color: #2ea043; color: #fff; }   /* 4 - 5 */
-        .pos-green-mid  { background-color: #3fb950; color: #000; }   /* 6 - 10 */
-        .pos-green-light{ background-color: #56d364; color: #000; }   /* 11 - 26 */
+        .pos-green-dark { background-color: #2ea043; color: #fff; }   
+        .pos-green-mid  { background-color: #3fb950; color: #000; }   
+        .pos-green-light{ background-color: #56d364; color: #000; }   
         
-        .pos-orange-light { background-color: #db6d28; color: #fff; } /* 27 - 30 */
-        .pos-orange-std   { background-color: #bc4c00; color: #fff; } /* 30+ */
-        .pos-orange-strong{ background-color: #9e2a2b; color: #fff; } /* Últimos 5 */
-        .pos-last         { background-color: #7f1d1d !important; color: #fff !important; font-weight: bold; } /* Último puesto */
-        
-        .pos-none { background-color: #21262d; color: #8b949e; }      /* No participa // */
+        .pos-orange-light { background-color: #db6d28; color: #fff; } 
+        .pos-orange-std   { background-color: #bc4c00; color: #fff; } 
+        .pos-orange-strong{ background-color: #9e2a2b; color: #fff; } 
+        .pos-last         { background-color: #7f1d1d !important; color: #fff !important; font-weight: bold; } 
+        .pos-none { background-color: #21262d; color: #8b949e; }      
 
-        /* Estilo para hacer las celdas editables y ocultar flechas de número */
         .rank-input {
             background: transparent;
             border: none;
@@ -126,7 +123,6 @@
 
         #status { text-align: center; font-weight: bold; margin: 15px 0; }
 
-        /* Contenedor inferior para centrar el botón */
         .action-bar {
             display: flex;
             justify-content: center;
@@ -171,7 +167,7 @@
                 </tr>
             </thead>
             <tbody id="table-body">
-                <!-- Los datos se inyectarán por JavaScript -->
+                <!-- Inyectado por JS -->
             </tbody>
         </table>
     </div>
@@ -215,7 +211,7 @@
         }
 
         let currentSortColumn = -1;
-        let sortDirection = false; // false = asc, true = desc
+        let sortDirection = false; 
 
         function construirMatriz(rankings, festival) {
             const paisesSet = new Set();
@@ -411,11 +407,23 @@
             const hoy = new Date().toISOString().split('T')[0];
 
             let registrosParaGuardar = [];
+            
+            // Ordenamos los países alfabéticamente para calcular su índice exacto (1-based index)
+            const paisesOrdenados = [...paises].sort();
+
             paises.forEach(p => {
                 anos.forEach(ano => {
                     let r = matriz[p][ano];
                     if (r !== undefined && r !== null && !isNaN(r)) {
+                        // Generación del ID personalizado: 3 últimos dígitos del año + posición alfabética del país (con 2 dígitos ej: 04)
+                        const anioStr = String(ano);
+                        const ultimosTresAnio = anioStr.slice(-3);
+                        const indexPais = paisesOrdenados.indexOf(p) + 1;
+                        const posPaisStr = String(indexPais).padStart(2, '0');
+                        const customId = ultimosTresAnio + posPaisStr; // Ej: Australia 2016 -> 01604
+
                         registrosParaGuardar.push({ 
+                            id: customId,
                             country: p, 
                             year: ano, 
                             rank: r, 
@@ -446,7 +454,6 @@
                     window.tablaData.fechasPorAnio[ano] = hoy;
                 });
                 
-                // Redibujar las cabeceras para actualizar las fechas al instante debajo del año
                 renderizarCabecerasYTabla();
 
                 statusDiv.textContent = `✅ ¡Cambios actualizados y guardados con éxito (${hoy})!`;
@@ -525,6 +532,5 @@
 
         cargarDatos();
     </script>
-
 </body>
 </html>
