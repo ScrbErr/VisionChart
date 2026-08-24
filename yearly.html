@@ -20,7 +20,7 @@
         .table-container {
             max-width: 100%;
             overflow: auto;
-            max-height: 75vh;
+            max-height: 70vh;
             border: 1px solid #30363d;
             border-radius: 8px;
             background: #161b22;
@@ -117,6 +117,54 @@
         }
 
         #status { text-align: center; font-weight: bold; margin-bottom: 15px; }
+
+        /* Panel de control inferior (Botón y Fechas de actualización) */
+        .control-panel {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .btn-update {
+            background-color: #2ea043;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .btn-update:hover {
+            background-color: #238636;
+        }
+
+        .update-info-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            font-size: 12px;
+            color: #8b949e;
+        }
+        .update-badge {
+            background: #21262d;
+            padding: 6px 10px;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+        }
+        .update-badge span {
+            color: #00d2ff;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -141,6 +189,14 @@
         </table>
     </div>
 
+    <!-- Panel inferior con el Botón Actualizar y las fechas por columna -->
+    <div class="control-panel">
+        <button class="btn-update" onclick="guardarTodosLosCambios()">ACTUALIZAR</button>
+        <div id="update-info" class="update-info-container">
+            <!-- Se inyectarán dinámicamente las fechas de actualización por año -->
+        </div>
+    </div>
+
     <script>
         const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1';
         const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
@@ -149,8 +205,9 @@
             const statusDiv = document.getElementById('status');
             
             try {
+                // Si tu tabla de base de datos guarda la fecha de actualización (ej: columna 'updated_at'), asegúrate de incluirla en el select.
                 const [resRankings, resFestival] = await Promise.all([
-                    fetch(`${SUPABASE_URL}/yearly_rankings?select=country,year,rank`, {
+                    fetch(`${SUPABASE_URL}/yearly_rankings?select=country,year,rank,updated_at`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
                     }),
                     fetch(`${SUPABASE_URL}/festival?select=country,year,withdrawn`, {
@@ -163,7 +220,7 @@
                 const rankings = await resRankings.json();
                 const festival = await resFestival.json();
                 
-                statusDiv.textContent = "✅ Matriz cargada con éxito.";
+                statusDiv.textContent = "✅ Matriz cargada con éxito. Modifica las celdas y pulsa 'ACTUALIZAR' abajo.";
                 statusDiv.style.color = '#3fb950';
 
                 construirMatriz(rankings, festival);
@@ -195,11 +252,19 @@
             const anos = Array.from(anosSet).sort((a, b) => a - b);
 
             const matriz = {};
+            const fechasActualizacion = {}; // Guardará la fecha por año
             paises.forEach(p => matriz[p] = {});
 
             rankings.forEach(r => {
                 if (r.country && r.year) {
                     matriz[r.country][r.year] = r.rank;
+                    // Si viene fecha de la BBDD la guardamos (asumiendo formato yyyy-mm-dd o similar)
+                    if (r.updated_at) {
+                        let fechaCorta = r.updated_at.split('T')[0]; // Extrae la parte yyyy-mm-dd
+                        if (!fechasActualizacion[r.year] || fechaCorta > fechasActualizacion[r.year]) {
+                            fechasActualizacion[r.year] = fechaCorta;
+                        }
+                    }
                 }
             });
 
@@ -217,7 +282,7 @@
                 trHeaders.innerHTML += `<th onclick="ordenarColumna(${index + 1})">${ano} ↕</th>`;
             });
 
-            window.tablaData = { paises, anos, matriz, retiradas };
+            window.tablaData = { paises, anos, matriz, retiradas, fechasActualizacion };
             renderizarTablaCompleta();
         }
 
@@ -244,7 +309,7 @@
         }
 
         function renderizarTablaCompleta() {
-            const { paises, anos, matriz, retiradas } = window.tablaData;
+            const { paises, anos, matriz, retiradas, fechasActualizacion } = window.tablaData;
             const { maxRangoPorAnio, totalParticipantesPorAnio } = calcularMaximosYParticipantes(paises, anos, matriz, retiradas);
 
             const tbody = document.getElementById('table-body');
@@ -274,17 +339,15 @@
                         input.value = (rank !== undefined && rank !== null && !isNaN(rank)) ? rank : '';
                         input.className = 'rank-input';
                         
-                        // Bloquear el ingreso de teclas no deseadas
                         input.addEventListener('keydown', (e) => {
                             if (['e', 'E', '+', '-', '.'].includes(e.key)) {
                                 e.preventDefault();
                             }
                             if (e.key === 'Enter') {
-                                input.blur(); // Al pulsar enter, quita el foco para aplicar el cambio
+                                input.blur();
                             }
                         });
 
-                        // El cambio se procesa cuando el usuario sale de la celda (blur) o cambia el valor
                         input.addEventListener('change', (e) => {
                             let rawVal = e.target.value.replace(/[^0-9]/g, '');
                             
@@ -298,9 +361,8 @@
 
                                 let oldVal = matriz[pais][ano];
 
-                                // Lógica de desplazamiento en cascada real (empujar posiciones)
+                                // Lógica de desplazamiento en cascada local
                                 if (oldVal === undefined || oldVal === null || isNaN(oldVal)) {
-                                    // Si antes estaba vacío y ahora ocupa una posición, empujamos hacia abajo a los que estén desde 'val' en adelante
                                     paises.forEach(p => {
                                         if (p !== pais) {
                                             let pRank = matriz[p][ano];
@@ -310,7 +372,6 @@
                                         }
                                     });
                                 } else if (val > oldVal) {
-                                    // El país empeora de puesto (ej: de 5 a 10). Los que estaban entre oldVal+1 y val bajan su puesto (restan 1 o suben en número)
                                     paises.forEach(p => {
                                         if (p !== pais) {
                                             let pRank = matriz[p][ano];
@@ -322,7 +383,6 @@
                                         }
                                     });
                                 } else if (val < oldVal) {
-                                    // El país mejora de puesto (ej: de 10 a 5). Los que estaban entre val y oldVal-1 suben su número de puesto (suman 1)
                                     paises.forEach(p => {
                                         if (p !== pais) {
                                             let pRank = matriz[p][ano];
@@ -338,7 +398,7 @@
                                 matriz[pais][ano] = val;
                             }
 
-                            // Refrescar toda la tabla para actualizar visualmente todas las posiciones afectadas
+                            // Renderizamos visualmente pero SIN enviar a la base de datos todavía
                             renderizarTablaCompleta(); 
                         });
 
@@ -351,6 +411,85 @@
                 });
                 tbody.appendChild(tr);
             });
+
+            // Actualizar el panel de fechas en la interfaz
+            actualizarPanelFechas(anos, fechasActualizacion);
+        }
+
+        function actualizarPanelFechas(anos, fechasActualizacion) {
+            const infoContainer = document.getElementById('update-info');
+            infoContainer.innerHTML = '';
+
+            anos.forEach(ano => {
+                let fechaStr = fechasActualizacion[ano] || 'Sin registrar';
+                let badge = document.createElement('div');
+                badge.className = 'update-badge';
+                badge.innerHTML = `${ano}: <span>${fechaStr}</span>`;
+                infoContainer.appendChild(badge);
+            });
+        }
+
+        // Función que se ejecuta al hacer clic en el botón ACTUALIZAR inferior
+        async function guardarTodosLosCambios() {
+            const { paises, anos, matriz, fechasActualizacion } = window.tablaData;
+            const statusDiv = document.getElementById('status');
+
+            // Generar la fecha actual en formato yyyy-mm-dd exacto
+            const hoy = new Date();
+            const yyyy = hoy.getFullYear();
+            const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+            const dd = String(hoy.getDate()).padStart(2, '0');
+            const fechaHoyStr = `${yyyy}-${mm}-${dd}`;
+
+            let registrosParaGuardar = [];
+
+            paises.forEach(p => {
+                anos.forEach(ano => {
+                    let r = matriz[p][ano];
+                    if (r !== undefined && r !== null && !isNaN(r)) {
+                        // Si tu tabla de Supabase cuenta con una columna de fecha (ej. updated_at), la enviamos aquí:
+                        registrosParaGuardar.push({ 
+                            country: p, 
+                            year: ano, 
+                            rank: r,
+                            updated_at: fechaHoyStr 
+                        });
+                    }
+                });
+            });
+
+            try {
+                statusDiv.textContent = "⏳ Guardando cambios masivos en Supabase...";
+                statusDiv.style.color = '#00d2ff';
+
+                const response = await fetch(`${SUPABASE_URL}/yearly_rankings`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'resolution=merge-duplicates' // Upsert
+                    },
+                    body: JSON.stringify(registrosParaGuardar)
+                });
+
+                if (!response.ok) throw new Error('Error al sincronizar con la base de datos.');
+
+                // Actualizamos las fechas localmente para reflejar el cambio al instante en pantalla
+                anos.forEach(ano => {
+                    fechasActualizacion[ano] = fechaHoyStr;
+                });
+
+                statusDiv.textContent = `✅ ¡Actualización completada con éxito! (${fechaHoyStr})`;
+                statusDiv.style.color = '#3fb950';
+
+                renderizarTablaCompleta();
+
+            } catch (error) {
+                statusDiv.textContent = '❌ Error al actualizar: ' + error.message;
+                statusDiv.style.color = '#f85149';
+                console.error(error);
+            }
         }
 
         function obtenerClasePosicion(pos, maxRangoAnio) {
