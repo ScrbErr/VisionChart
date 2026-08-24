@@ -20,7 +20,7 @@
         .table-container {
             max-width: 100%;
             overflow: auto;
-            max-height: 70vh;
+            max-height: 75vh;
             border: 1px solid #30363d;
             border-radius: 8px;
             background: #161b22;
@@ -40,6 +40,7 @@
             border: 1px solid #30363d;
         }
 
+        /* Columna fija de Países a la izquierda */
         th:first-child, td:first-child {
             position: sticky;
             left: 0;
@@ -58,6 +59,7 @@
             cursor: pointer;
         }
 
+        /* Cabecera superior fija */
         th {
             background-color: #1f242c;
             color: #00d2ff;
@@ -71,20 +73,23 @@
             background-color: #30363d;
         }
 
-        .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; }
-        .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; }
-        .pos-3 { background-color: #e08a1e !important; color: #000 !important; font-weight: bold; }
+        /* Clases de colores mejorados y diferenciados */
+        .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; } /* Oro */
+        .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; } /* Plata */
+        .pos-3 { background-color: #e08a1e !important; color: #000 !important; font-weight: bold; } /* Bronce (Cobre brillante) */
         
-        .pos-green-dark { background-color: #2ea043; color: #fff; }
-        .pos-green-mid  { background-color: #3fb950; color: #000; }
-        .pos-green-light{ background-color: #56d364; color: #000; }
+        .pos-green-dark { background-color: #2ea043; color: #fff; }   /* 4 - 5 */
+        .pos-green-mid  { background-color: #3fb950; color: #000; }   /* 6 - 10 */
+        .pos-green-light{ background-color: #56d364; color: #000; }   /* 11 - 26 */
         
-        .pos-orange-light { background-color: #db6d28; color: #fff; }
-        .pos-orange-std   { background-color: #bc4c00; color: #fff; }
-        .pos-orange-strong{ background-color: #9e2a2b; color: #fff; }
-        .pos-last         { background-color: #7f1d1d !important; color: #fff !important; font-weight: bold; }
-        .pos-none         { background-color: #21262d; color: #8b949e; }
+        .pos-orange-light { background-color: #db6d28; color: #fff; } /* 27 - 30 */
+        .pos-orange-std   { background-color: #bc4c00; color: #fff; } /* 30+ */
+        .pos-orange-strong{ background-color: #9e2a2b; color: #fff; } /* Últimos 5 */
+        .pos-last         { background-color: #7f1d1d !important; color: #fff !important; font-weight: bold; } /* Último puesto (Vino tinto diferenciado) */
+        
+        .pos-none { background-color: #21262d; color: #8b949e; }      /* No participa // */
 
+        /* Estilo para hacer las celdas editables y ocultar flechas de número */
         .rank-input {
             background: transparent;
             border: none;
@@ -100,63 +105,18 @@
             border-radius: 4px;
         }
 
+        /* Ocultar flechas en Chrome, Safari, Edge, Opera */
         .rank-input::-webkit-outer-spin-button,
         .rank-input::-webkit-inner-spin-button {
             -webkit-appearance: none;
             margin: 0;
         }
+        /* Ocultar flechas en Firefox */
         .rank-input {
             -moz-appearance: textfield;
         }
 
         #status { text-align: center; font-weight: bold; margin-bottom: 15px; }
-
-        .control-panel {
-            margin-top: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
-            background: #161b22;
-            border: 1px solid #30363d;
-            padding: 20px;
-            border-radius: 8px;
-        }
-
-        .btn-update {
-            background-color: #2ea043;
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
-        .btn-update:hover {
-            background-color: #238636;
-        }
-
-        .update-info-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            justify-content: center;
-            font-size: 12px;
-            color: #8b949e;
-        }
-        .update-badge {
-            background: #21262d;
-            padding: 6px 10px;
-            border: 1px solid #30363d;
-            border-radius: 4px;
-        }
-        .update-badge span {
-            color: #00d2ff;
-            font-weight: bold;
-        }
     </style>
 </head>
 <body>
@@ -181,22 +141,16 @@
         </table>
     </div>
 
-    <div class="control-panel">
-        <button class="btn-update" onclick="guardarTodosLosCambios()">ACTUALIZAR</button>
-        <div id="update-info" class="update-info-container"></div>
-    </div>
-
     <script>
-        // Asegúrate de que no queden espacios en blanco al copiar/pegar estas constantes
-        const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1'.trim();
-        const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl'.trim();
+        const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1';
+        const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
 
         async function cargarDatos() {
             const statusDiv = document.getElementById('status');
             
             try {
                 const [resRankings, resFestival] = await Promise.all([
-                    fetch(`${SUPABASE_URL}/yearly_rankings?select=country,year,rank,updated_at`, {
+                    fetch(`${SUPABASE_URL}/yearly_rankings?select=country,year,rank`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
                     }),
                     fetch(`${SUPABASE_URL}/festival?select=country,year,withdrawn`, {
@@ -204,19 +158,12 @@
                     })
                 ]);
 
-                if (!resRankings.ok) {
-                    const errText = await resRankings.text();
-                    throw new Error(`yearly_rankings (${resRankings.status}): ${errText}`);
-                }
-                if (!resFestival.ok) {
-                    const errText = await resFestival.text();
-                    throw new Error(`festival (${resFestival.status}): ${errText}`);
-                }
+                if (!resRankings.ok || !resFestival.ok) throw new Error('Error al conectar con Supabase.');
 
                 const rankings = await resRankings.json();
                 const festival = await resFestival.json();
                 
-                statusDiv.textContent = "✅ Matriz cargada con éxito. Modifica las celdas y pulsa 'ACTUALIZAR' abajo.";
+                statusDiv.textContent = "✅ Matriz cargada con éxito.";
                 statusDiv.style.color = '#3fb950';
 
                 construirMatriz(rankings, festival);
@@ -224,12 +171,12 @@
             } catch (error) {
                 statusDiv.textContent = '❌ Error: ' + error.message;
                 statusDiv.style.color = '#f85149';
-                console.error("Detalle del error:", error);
+                console.error(error);
             }
         }
 
         let currentSortColumn = -1;
-        let sortDirection = false;
+        let sortDirection = false; // false = asc, true = desc
 
         function construirMatriz(rankings, festival) {
             const paisesSet = new Set();
@@ -248,18 +195,11 @@
             const anos = Array.from(anosSet).sort((a, b) => a - b);
 
             const matriz = {};
-            const fechasActualizacion = {};
             paises.forEach(p => matriz[p] = {});
 
             rankings.forEach(r => {
                 if (r.country && r.year) {
                     matriz[r.country][r.year] = r.rank;
-                    if (r.updated_at) {
-                        let fechaCorta = r.updated_at.split('T')[0];
-                        if (!fechasActualizacion[r.year] || fechaCorta > fechasActualizacion[r.year]) {
-                            fechasActualizacion[r.year] = fechaCorta;
-                        }
-                    }
                 }
             });
 
@@ -277,7 +217,7 @@
                 trHeaders.innerHTML += `<th onclick="ordenarColumna(${index + 1})">${ano} ↕</th>`;
             });
 
-            window.tablaData = { paises, anos, matriz, retiradas, fechasActualizacion };
+            window.tablaData = { paises, anos, matriz, retiradas };
             renderizarTablaCompleta();
         }
 
@@ -303,8 +243,48 @@
             return { maxRangoPorAnio, totalParticipantesPorAnio };
         }
 
+        // Función para guardar los cambios del año afectado en Supabase
+        async function guardarCambiosEnSupabase(ano) {
+            const { paises, matriz } = window.tablaData;
+            const statusDiv = document.getElementById('status');
+
+            let registrosParaGuardar = [];
+            paises.forEach(p => {
+                let r = matriz[p][ano];
+                if (r !== undefined && r !== null && !isNaN(r)) {
+                    registrosParaGuardar.push({ country: p, year: ano, rank: r });
+                }
+            });
+
+            try {
+                const response = await fetch(`${SUPABASE_URL}/yearly_rankings`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'resolution=merge-duplicates' // Esto hace la función de Upsert
+                    },
+                    body: JSON.stringify(registrosParaGuardar)
+                });
+
+                if (!response.ok) throw new Error('Error al guardar en la base de datos.');
+
+                statusDiv.textContent = `💾 Cambios del año ${ano} guardados en Supabase.`;
+                statusDiv.style.color = '#3fb950';
+                setTimeout(() => {
+                    statusDiv.textContent = "✅ Matriz cargada con éxito.";
+                }, 2000);
+
+            } catch (error) {
+                statusDiv.textContent = '❌ Error al sincronizar: ' + error.message;
+                statusDiv.style.color = '#f85149';
+                console.error(error);
+            }
+        }
+
         function renderizarTablaCompleta() {
-            const { paises, anos, matriz, retiradas, fechasActualizacion } = window.tablaData;
+            const { paises, anos, matriz, retiradas } = window.tablaData;
             const { maxRangoPorAnio, totalParticipantesPorAnio } = calcularMaximosYParticipantes(paises, anos, matriz, retiradas);
 
             const tbody = document.getElementById('table-body');
@@ -334,15 +314,17 @@
                         input.value = (rank !== undefined && rank !== null && !isNaN(rank)) ? rank : '';
                         input.className = 'rank-input';
                         
+                        // Bloquear el ingreso de teclas no deseadas
                         input.addEventListener('keydown', (e) => {
                             if (['e', 'E', '+', '-', '.'].includes(e.key)) {
                                 e.preventDefault();
                             }
                             if (e.key === 'Enter') {
-                                input.blur();
+                                input.blur(); // Al pulsar enter, quita el foco para aplicar el cambio
                             }
                         });
 
+                        // El cambio se procesa cuando el usuario sale de la celda (blur) o cambia el valor
                         input.addEventListener('change', (e) => {
                             let rawVal = e.target.value.replace(/[^0-9]/g, '');
                             
@@ -356,6 +338,7 @@
 
                                 let oldVal = matriz[pais][ano];
 
+                                // Lógica de desplazamiento en cascada real (empujar posiciones)
                                 if (oldVal === undefined || oldVal === null || isNaN(oldVal)) {
                                     paises.forEach(p => {
                                         if (p !== pais) {
@@ -392,7 +375,9 @@
                                 matriz[pais][ano] = val;
                             }
 
+                            // Refrescar toda la tabla visualmente y guardar en Supabase
                             renderizarTablaCompleta(); 
+                            guardarCambiosEnSupabase(ano);
                         });
 
                         td.appendChild(input);
@@ -404,83 +389,6 @@
                 });
                 tbody.appendChild(tr);
             });
-
-            actualizarPanelFechas(anos, fechasActualizacion);
-        }
-
-        function actualizarPanelFechas(anos, fechasActualizacion) {
-            const infoContainer = document.getElementById('update-info');
-            infoContainer.innerHTML = '';
-
-            anos.forEach(ano => {
-                let fechaStr = fechasActualizacion[ano] || 'Sin registrar';
-                let badge = document.createElement('div');
-                badge.className = 'update-badge';
-                badge.innerHTML = `${ano}: <span>${fechaStr}</span>`;
-                infoContainer.appendChild(badge);
-            });
-        }
-
-        async function guardarTodosLosCambios() {
-            const { paises, anos, matriz, fechasActualizacion } = window.tablaData;
-            const statusDiv = document.getElementById('status');
-
-            const hoy = new Date();
-            const yyyy = hoy.getFullYear();
-            const mm = String(hoy.getMonth() + 1).padStart(2, '0');
-            const dd = String(hoy.getDate()).padStart(2, '0');
-            const fechaHoyStr = `${yyyy}-${mm}-${dd}`;
-
-            let registrosParaGuardar = [];
-
-            paises.forEach(p => {
-                anos.forEach(ano => {
-                    let r = matriz[p][ano];
-                    if (r !== undefined && r !== null && !isNaN(r)) {
-                        registrosParaGuardar.push({ 
-                            country: p, 
-                            year: ano, 
-                            rank: r,
-                            updated_at: fechaHoyStr 
-                        });
-                    }
-                });
-            });
-
-            try {
-                statusDiv.textContent = "⏳ Guardando cambios masivos en Supabase...";
-                statusDiv.style.color = '#00d2ff';
-
-                const response = await fetch(`${SUPABASE_URL}/yearly_rankings`, {
-                    method: 'POST',
-                    headers: {
-                        'apikey': SUPABASE_ANON_KEY,
-                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-                        'Content-Type': 'application/json',
-                        'Prefer': 'resolution=merge-duplicates'
-                    },
-                    body: JSON.stringify(registrosParaGuardar)
-                });
-
-                if (!response.ok) {
-                    const errText = await response.text();
-                    throw new Error(`Error al sincronizar (${response.status}): ${errText}`);
-                }
-
-                anos.forEach(ano => {
-                    fechasActualizacion[ano] = fechaHoyStr;
-                });
-
-                statusDiv.textContent = `✅ ¡Actualización completada con éxito! (${fechaHoyStr})`;
-                statusDiv.style.color = '#3fb950';
-
-                renderizarTablaCompleta();
-
-            } catch (error) {
-                statusDiv.textContent = '❌ Error al actualizar: ' + error.message;
-                statusDiv.style.color = '#f85149';
-                console.error(error);
-            }
         }
 
         function obtenerClasePosicion(pos, maxRangoAnio) {
