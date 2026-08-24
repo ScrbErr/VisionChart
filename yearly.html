@@ -405,18 +405,25 @@
         }
 
         async function guardarCambiosEnSupabase() {
-            
-const response = await fetch(`${SUPABASE_URL}/yearly_rankings`, {
-    method: 'POST',
-    headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-        'Content-Type': 'application/json',
-        // Cambia esta línea para indicarle la clave compuesta original:
-        'Prefer': 'resolution=merge-duplicates,on_conflict=country,year'
-    },
-    body: JSON.stringify(registrosParaGuardar)
-});
+            const { paises, anos, matriz } = window.tablaData;
+            const statusDiv = document.getElementById('status');
+
+            const hoy = new Date().toISOString().split('T')[0];
+
+            let registrosParaGuardar = [];
+            paises.forEach(p => {
+                anos.forEach(ano => {
+                    let r = matriz[p][ano];
+                    if (r !== undefined && r !== null && !isNaN(r)) {
+                        registrosParaGuardar.push({ 
+                            country: p, 
+                            year: ano, 
+                            rank: r, 
+                            date: hoy 
+                        });
+                    }
+                });
+            });
 
             statusDiv.textContent = "💾 Guardando cambios en Supabase...";
             statusDiv.style.color = '#00d2ff';
