@@ -189,7 +189,7 @@
             
             try {
                 const [resRankings, resFestival] = await Promise.all([
-                    fetch(`${SUPABASE_URL}/yearly_rankings?select=country,year,rank,date,id`, {
+                    fetch(`${SUPABASE_URL}/yearly_rankings?select=country,year,rank,date`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
                     }),
                     fetch(`${SUPABASE_URL}/festival?select=country,year,withdrawn`, {
@@ -411,21 +411,14 @@
             const hoy = new Date().toISOString().split('T')[0];
 
             let registrosParaGuardar = [];
-            
-            paises.forEach((p, pIndex) => {
-                let countryIndexStr = String(pIndex + 1).padStart(2, '0');
-
+            paises.forEach(p => {
                 anos.forEach(ano => {
                     let r = matriz[p][ano];
                     if (r !== undefined && r !== null && !isNaN(r)) {
-                        let shortYearStr = String(ano).slice(-3); // Ej: 2024 -> '024'
-                        let customId = shortYearStr + countryIndexStr; // Ej: '02401'
-
                         registrosParaGuardar.push({ 
-                            id: customId,
                             country: p, 
-                            year: Number(ano), 
-                            rank: Number(r), 
+                            year: ano, 
+                            rank: r, 
                             date: hoy 
                         });
                     }
@@ -436,7 +429,7 @@
             statusDiv.style.color = '#00d2ff';
 
             try {
-                const response = await fetch(`${SUPABASE_URL}/yearly_rankings?on_conflict=country,year`, {
+                const response = await fetch(`${SUPABASE_URL}/yearly_rankings`, {
                     method: 'POST',
                     headers: {
                         'apikey': SUPABASE_ANON_KEY,
@@ -447,15 +440,13 @@
                     body: JSON.stringify(registrosParaGuardar)
                 });
 
-                if (!response.ok) {
-                    let errorText = await response.text();
-                    throw new Error(`Error al guardar en la base de datos (${response.status}): ${errorText}`);
-                }
+                if (!response.ok) throw new Error('Error al guardar en la base de datos.');
 
                 anos.forEach(ano => {
                     window.tablaData.fechasPorAnio[ano] = hoy;
                 });
                 
+                // Redibujar las cabeceras para actualizar las fechas al instante debajo del año
                 renderizarCabecerasYTabla();
 
                 statusDiv.textContent = `✅ ¡Cambios actualizados y guardados con éxito (${hoy})!`;
