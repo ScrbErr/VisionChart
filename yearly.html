@@ -40,7 +40,6 @@
             border: 1px solid #30363d;
         }
 
-        /* Columna fija de Países a la izquierda */
         th:first-child, td:first-child {
             position: sticky;
             left: 0;
@@ -59,7 +58,6 @@
             cursor: pointer;
         }
 
-        /* Cabecera superior fija */
         th {
             background-color: #1f242c;
             color: #00d2ff;
@@ -73,23 +71,20 @@
             background-color: #30363d;
         }
 
-        /* Clases de colores según la posición */
-        .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; } /* Oro */
-        .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; } /* Plata */
-        .pos-3 { background-color: #e08a1e !important; color: #000 !important; font-weight: bold; } /* Bronce */
+        .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; }
+        .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; }
+        .pos-3 { background-color: #e08a1e !important; color: #000 !important; font-weight: bold; }
         
-        .pos-green-dark { background-color: #2ea043; color: #fff; }   /* 4 - 5 */
-        .pos-green-mid  { background-color: #3fb950; color: #000; }   /* 6 - 10 */
-        .pos-green-light{ background-color: #56d364; color: #000; }   /* 11 - 26 */
+        .pos-green-dark { background-color: #2ea043; color: #fff; }
+        .pos-green-mid  { background-color: #3fb950; color: #000; }
+        .pos-green-light{ background-color: #56d364; color: #000; }
         
-        .pos-orange-light { background-color: #db6d28; color: #fff; } /* 27 - 30 */
-        .pos-orange-std   { background-color: #bc4c00; color: #fff; } /* 30+ */
-        .pos-orange-strong{ background-color: #9e2a2b; color: #fff; } /* Últimos 5 */
-        .pos-last         { background-color: #7f1d1d !important; color: #fff !important; font-weight: bold; } /* Último puesto */
-        
-        .pos-none { background-color: #21262d; color: #8b949e; }      /* No participa // */
+        .pos-orange-light { background-color: #db6d28; color: #fff; }
+        .pos-orange-std   { background-color: #bc4c00; color: #fff; }
+        .pos-orange-strong{ background-color: #9e2a2b; color: #fff; }
+        .pos-last         { background-color: #7f1d1d !important; color: #fff !important; font-weight: bold; }
+        .pos-none         { background-color: #21262d; color: #8b949e; }
 
-        /* Estilo para hacer las celdas editables y ocultar flechas de número */
         .rank-input {
             background: transparent;
             border: none;
@@ -105,20 +100,17 @@
             border-radius: 4px;
         }
 
-        /* Ocultar flechas en Chrome, Safari, Edge, Opera */
         .rank-input::-webkit-outer-spin-button,
         .rank-input::-webkit-inner-spin-button {
             -webkit-appearance: none;
             margin: 0;
         }
-        /* Ocultar flechas en Firefox */
         .rank-input {
             -moz-appearance: textfield;
         }
 
         #status { text-align: center; font-weight: bold; margin-bottom: 15px; }
 
-        /* Panel de control inferior (Botón y Fechas de actualización) */
         .control-panel {
             margin-top: 20px;
             display: flex;
@@ -189,23 +181,20 @@
         </table>
     </div>
 
-    <!-- Panel inferior con el Botón Actualizar y las fechas por columna -->
     <div class="control-panel">
         <button class="btn-update" onclick="guardarTodosLosCambios()">ACTUALIZAR</button>
-        <div id="update-info" class="update-info-container">
-            <!-- Se inyectarán dinámicamente las fechas de actualización por año -->
-        </div>
+        <div id="update-info" class="update-info-container"></div>
     </div>
 
     <script>
-        const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1';
-        const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
+        // Asegúrate de que no queden espacios en blanco al copiar/pegar estas constantes
+        const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1'.trim();
+        const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl'.trim();
 
         async function cargarDatos() {
             const statusDiv = document.getElementById('status');
             
             try {
-                // Si tu tabla de base de datos guarda la fecha de actualización (ej: columna 'updated_at'), asegúrate de incluirla en el select.
                 const [resRankings, resFestival] = await Promise.all([
                     fetch(`${SUPABASE_URL}/yearly_rankings?select=country,year,rank,updated_at`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
@@ -215,7 +204,14 @@
                     })
                 ]);
 
-                if (!resRankings.ok || !resFestival.ok) throw new Error('Error al conectar con Supabase.');
+                if (!resRankings.ok) {
+                    const errText = await resRankings.text();
+                    throw new Error(`yearly_rankings (${resRankings.status}): ${errText}`);
+                }
+                if (!resFestival.ok) {
+                    const errText = await resFestival.text();
+                    throw new Error(`festival (${resFestival.status}): ${errText}`);
+                }
 
                 const rankings = await resRankings.json();
                 const festival = await resFestival.json();
@@ -228,12 +224,12 @@
             } catch (error) {
                 statusDiv.textContent = '❌ Error: ' + error.message;
                 statusDiv.style.color = '#f85149';
-                console.error(error);
+                console.error("Detalle del error:", error);
             }
         }
 
         let currentSortColumn = -1;
-        let sortDirection = false; // false = asc, true = desc
+        let sortDirection = false;
 
         function construirMatriz(rankings, festival) {
             const paisesSet = new Set();
@@ -252,15 +248,14 @@
             const anos = Array.from(anosSet).sort((a, b) => a - b);
 
             const matriz = {};
-            const fechasActualizacion = {}; // Guardará la fecha por año
+            const fechasActualizacion = {};
             paises.forEach(p => matriz[p] = {});
 
             rankings.forEach(r => {
                 if (r.country && r.year) {
                     matriz[r.country][r.year] = r.rank;
-                    // Si viene fecha de la BBDD la guardamos (asumiendo formato yyyy-mm-dd o similar)
                     if (r.updated_at) {
-                        let fechaCorta = r.updated_at.split('T')[0]; // Extrae la parte yyyy-mm-dd
+                        let fechaCorta = r.updated_at.split('T')[0];
                         if (!fechasActualizacion[r.year] || fechaCorta > fechasActualizacion[r.year]) {
                             fechasActualizacion[r.year] = fechaCorta;
                         }
@@ -361,7 +356,6 @@
 
                                 let oldVal = matriz[pais][ano];
 
-                                // Lógica de desplazamiento en cascada local
                                 if (oldVal === undefined || oldVal === null || isNaN(oldVal)) {
                                     paises.forEach(p => {
                                         if (p !== pais) {
@@ -398,7 +392,6 @@
                                 matriz[pais][ano] = val;
                             }
 
-                            // Renderizamos visualmente pero SIN enviar a la base de datos todavía
                             renderizarTablaCompleta(); 
                         });
 
@@ -412,7 +405,6 @@
                 tbody.appendChild(tr);
             });
 
-            // Actualizar el panel de fechas en la interfaz
             actualizarPanelFechas(anos, fechasActualizacion);
         }
 
@@ -429,12 +421,10 @@
             });
         }
 
-        // Función que se ejecuta al hacer clic en el botón ACTUALIZAR inferior
         async function guardarTodosLosCambios() {
             const { paises, anos, matriz, fechasActualizacion } = window.tablaData;
             const statusDiv = document.getElementById('status');
 
-            // Generar la fecha actual en formato yyyy-mm-dd exacto
             const hoy = new Date();
             const yyyy = hoy.getFullYear();
             const mm = String(hoy.getMonth() + 1).padStart(2, '0');
@@ -447,7 +437,6 @@
                 anos.forEach(ano => {
                     let r = matriz[p][ano];
                     if (r !== undefined && r !== null && !isNaN(r)) {
-                        // Si tu tabla de Supabase cuenta con una columna de fecha (ej. updated_at), la enviamos aquí:
                         registrosParaGuardar.push({ 
                             country: p, 
                             year: ano, 
@@ -468,14 +457,16 @@
                         'apikey': SUPABASE_ANON_KEY,
                         'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
                         'Content-Type': 'application/json',
-                        'Prefer': 'resolution=merge-duplicates' // Upsert
+                        'Prefer': 'resolution=merge-duplicates'
                     },
                     body: JSON.stringify(registrosParaGuardar)
                 });
 
-                if (!response.ok) throw new Error('Error al sincronizar con la base de datos.');
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(`Error al sincronizar (${response.status}): ${errText}`);
+                }
 
-                // Actualizamos las fechas localmente para reflejar el cambio al instante en pantalla
                 anos.forEach(ano => {
                     fechasActualizacion[ano] = fechaHoyStr;
                 });
