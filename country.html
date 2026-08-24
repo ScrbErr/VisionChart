@@ -104,7 +104,6 @@
             outline: none;
         }
 
-        /* Ocultar flechas de incremento/decremento en inputs number */
         .rank-input::-webkit-outer-spin-button,
         .rank-input::-webkit-inner-spin-button {
             -webkit-appearance: none;
@@ -337,12 +336,12 @@
                 tdAno.textContent = ano;
                 tr.appendChild(tdAno);
 
-                // Contar cuántos países participan realmente este año (excluyendo retirados y vacíos)
+                // Contar cuántos países tienen una posición numérica válida en este año
                 let activosEnAno = 0;
                 paises.forEach(p => {
                     let v = matriz[ano] && matriz[ano][p];
                     let isW = retiradosMap[ano] && retiradosMap[ano][p];
-                    if (v !== undefined && v !== '' && v !== null && !isW && v !== '//') {
+                    if (v !== undefined && v !== '' && v !== null && !isW && v !== '//' && !isNaN(parseInt(v))) {
                         activosEnAno++;
                     }
                 });
@@ -402,39 +401,12 @@
             if (nuevoVal > maxVal) nuevoVal = maxVal;
 
             let matrizAno = window.tablaData.matriz[y];
-            let viejoVal = parseInt(matrizAno[c]);
 
-            // Lógica de desplazamiento por año para mantener posiciones únicas
-            if (!isNaN(viejoVal) && viejoVal !== nuevoVal) {
-                if (nuevoVal > viejoVal) {
-                    // Si el número aumenta, los que estaban entre viejo y nuevo bajan una posición
-                    for (let p in matrizAno) {
-                        if (p !== c) {
-                            let pVal = parseInt(matrizAno[p]);
-                            if (!isNaN(pVal) && pVal > viejoVal && pVal <= nuevoVal) {
-                                matrizAno[p] = pVal - 1;
-                                registrarCambio(y, p, matrizAno[p]);
-                            }
-                        }
-                    }
-                } else {
-                    // Si el número disminuye, los que estaban entre nuevo y viejo suben una posición
-                    for (let p in matrizAno) {
-                        if (p !== c) {
-                            let pVal = parseInt(matrizAno[p]);
-                            if (!isNaN(pVal) && pVal >= nuevoVal && pVal < viejoVal) {
-                                matrizAno[p] = pVal + 1;
-                                registrarCambio(y, p, matrizAno[p]);
-                            }
-                        }
-                    }
-                }
-            }
-
+            // Asignación directa y limpia: Solo cambiamos el país seleccionado. 
+            // Si quieres que intercambien posición si otro ya la tiene, puedes gestionarlo aquí o dejarlo fijo.
             matrizAno[c] = nuevoVal;
             registrarCambio(y, c, nuevoVal);
 
-            // Re-renderizar la tabla para reflejar todos los cambios de desplazamiento en tiempo real
             renderizarTablaCompleta();
             actualizarEstadoBotonGuardar();
         }
