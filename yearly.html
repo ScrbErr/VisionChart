@@ -274,37 +274,68 @@
                         input.value = (rank !== undefined && rank !== null && !isNaN(rank)) ? rank : '';
                         input.className = 'rank-input';
                         
-                        // Bloquear el ingreso de letras, símbolos o la tecla 'e'
+                        // Bloquear el ingreso de teclas no deseadas
                         input.addEventListener('keydown', (e) => {
                             if (['e', 'E', '+', '-', '.'].includes(e.key)) {
                                 e.preventDefault();
                             }
+                            if (e.key === 'Enter') {
+                                input.blur(); // Al pulsar enter, quita el foco para aplicar el cambio
+                            }
                         });
 
-                        input.addEventListener('input', (e) => {
+                        // El cambio se procesa cuando el usuario sale de la celda (blur) o cambia el valor
+                        input.addEventListener('change', (e) => {
                             let rawVal = e.target.value.replace(/[^0-9]/g, '');
-                            let val = parseInt(rawVal);
                             
                             if (rawVal === '') {
                                 matriz[pais][ano] = null;
                                 e.target.value = '';
                             } else {
+                                let val = parseInt(rawVal);
                                 if (val < 1) val = 1;
                                 if (val > maxAllowed) val = maxAllowed;
-                                
-                                // Control de valores únicos para el mismo año
+
+                                // Lógica de desplazamiento (empujar posiciones hacia abajo/arriba)
+                                let ocupadoPor = null;
                                 for (let p of paises) {
                                     if (p !== pais && matriz[p][ano] === val) {
-                                        matriz[p][ano] = null; // Limpia el duplicado anterior si se repite
+                                        ocupadoPor = p;
+                                        break;
                                     }
                                 }
 
-                                e.target.value = val;
+                                // Si la posición está ocupada, desplazamos al resto de países afectados
+                                if (ocupadoPor !== null) {
+                                    let oldVal = matriz[pais][ano];
+                                    if (oldVal !== undefined && oldVal !== null && !isNaN(oldVal)) {
+                                        // Si ya tenía un valor, hacemos intercambio simple
+                                        matriz[ocupadoPor][ano] = oldVal;
+                                    } else {
+                                        // Si estaba vacío, desplazamos hacia abajo a los demás
+                                        let currentTargetVal = val;
+                                        let currentCountryToMove = ocupadoPor;
+                                        
+                                        while (currentCountryToMove && currentTargetVal < maxAllowed) {
+                                            currentTargetVal++;
+                                            let nextOwner = null;
+                                            for (let p of paises) {
+                                                if (p !== currentCountryToMove && matriz[p][ano] === currentTargetVal) {
+                                                    nextOwner = p;
+                                                    break;
+                                                }
+                                            }
+                                            matriz[currentCountryToMove][ano] = currentTargetVal;
+                                            currentCountryToMove = nextOwner;
+                                        }
+                                    }
+                                }
+
                                 matriz[pais][ano] = val;
                             }
 
-                            // Refrescar toda la tabla para actualizar visualmente duplicados y colores
-                            renderizarTablaCompletaInputs(false); 
+                            // Refrescar toda la tabla para actualizar visualmente todas las posiciones afectadas
+                            renderizarTablaCompleta(); 
                         });
 
                         td.appendChild(input);
@@ -316,36 +347,6 @@
                 });
                 tbody.appendChild(tr);
             });
-        }
-
-        // Renderizado rápido que no destruye el foco del input actual
-        function renderizarTablaCompletaInputs(rebuild = true) {
-            if (rebuild) {
-                renderizarTablaCompleta();
-            } else {
-                const { paises, anos, matriz, retiradas } = window.tablaData;
-                const { maxRangoPorAnio } = calcularMaximosYParticipantes(paises, anos, matriz, retiradas);
-                const rows = document.getElementById('table-body').rows;
-
-                paises.forEach((pais, i) => {
-                    anos.forEach((ano, j) => {
-                        let td = rows[i].cells[j + 1];
-                        let rank = matriz[pais][ano];
-                        let isWithdrawn = retiradas[pais] && retiradas[pais][ano] === true;
-                        let maxR = maxRangoPorAnio[ano] || 25;
-
-                        if (!isWithdrawn) {
-                            let input = td.querySelector('.rank-input');
-                            if (input && document.activeElement !== input) {
-                                input.value = (rank !== undefined && rank !== null && !isNaN(rank)) ? rank : '';
-                            }
-                            td.className = (rank !== undefined && rank !== null && !isNaN(rank)) 
-                                ? obtenerClasePosicion(rank, maxR) 
-                                : 'pos-none';
-                        }
-                    });
-                });
-            }
         }
 
         function obtenerClasePosicion(pos, maxRangoAnio) {
