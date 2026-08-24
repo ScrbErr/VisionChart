@@ -296,39 +296,43 @@
                                 if (val < 1) val = 1;
                                 if (val > maxAllowed) val = maxAllowed;
 
-                                // Lógica de desplazamiento (empujar posiciones hacia abajo/arriba)
-                                let ocupadoPor = null;
-                                for (let p of paises) {
-                                    if (p !== pais && matriz[p][ano] === val) {
-                                        ocupadoPor = p;
-                                        break;
-                                    }
-                                }
+                                let oldVal = matriz[pais][ano];
 
-                                // Si la posición está ocupada, desplazamos al resto de países afectados
-                                if (ocupadoPor !== null) {
-                                    let oldVal = matriz[pais][ano];
-                                    if (oldVal !== undefined && oldVal !== null && !isNaN(oldVal)) {
-                                        // Si ya tenía un valor, hacemos intercambio simple
-                                        matriz[ocupadoPor][ano] = oldVal;
-                                    } else {
-                                        // Si estaba vacío, desplazamos hacia abajo a los demás
-                                        let currentTargetVal = val;
-                                        let currentCountryToMove = ocupadoPor;
-                                        
-                                        while (currentCountryToMove && currentTargetVal < maxAllowed) {
-                                            currentTargetVal++;
-                                            let nextOwner = null;
-                                            for (let p of paises) {
-                                                if (p !== currentCountryToMove && matriz[p][ano] === currentTargetVal) {
-                                                    nextOwner = p;
-                                                    break;
+                                // Lógica de desplazamiento en cascada real (empujar posiciones)
+                                if (oldVal === undefined || oldVal === null || isNaN(oldVal)) {
+                                    // Si antes estaba vacío y ahora ocupa una posición, empujamos hacia abajo a los que estén desde 'val' en adelante
+                                    paises.forEach(p => {
+                                        if (p !== pais) {
+                                            let pRank = matriz[p][ano];
+                                            if (pRank !== undefined && pRank !== null && !isNaN(pRank) && pRank >= val) {
+                                                matriz[p][ano] = pRank + 1;
+                                            }
+                                        }
+                                    });
+                                } else if (val > oldVal) {
+                                    // El país empeora de puesto (ej: de 5 a 10). Los que estaban entre oldVal+1 y val bajan su puesto (restan 1 o suben en número)
+                                    paises.forEach(p => {
+                                        if (p !== pais) {
+                                            let pRank = matriz[p][ano];
+                                            if (pRank !== undefined && pRank !== null && !isNaN(pRank)) {
+                                                if (pRank > oldVal && pRank <= val) {
+                                                    matriz[p][ano] = pRank - 1;
                                                 }
                                             }
-                                            matriz[currentCountryToMove][ano] = currentTargetVal;
-                                            currentCountryToMove = nextOwner;
                                         }
-                                    }
+                                    });
+                                } else if (val < oldVal) {
+                                    // El país mejora de puesto (ej: de 10 a 5). Los que estaban entre val y oldVal-1 suben su número de puesto (suman 1)
+                                    paises.forEach(p => {
+                                        if (p !== pais) {
+                                            let pRank = matriz[p][ano];
+                                            if (pRank !== undefined && pRank !== null && !isNaN(pRank)) {
+                                                if (pRank >= val && pRank < oldVal) {
+                                                    matriz[p][ano] = pRank + 1;
+                                                }
+                                            }
+                                        }
+                                    });
                                 }
 
                                 matriz[pais][ano] = val;
