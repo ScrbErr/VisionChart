@@ -6,7 +6,7 @@
     <style>
         body { 
             font-family: Arial, sans-serif; 
-            max-width: 900px; 
+            max-width: 1100px; 
             margin: 40px auto; 
             padding: 0 20px; 
             background: #0d1117; 
@@ -52,17 +52,32 @@
         }
         .btn-secondary:hover {
             background: #30363d;
-            color: #39h;
         }
 
-        /* Cuadrícula de países inferior */
+        /* Cuadrícula de países inferior optimizada para muchos elementos */
         .countries-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
             gap: 10px;
             margin-top: 15px;
             text-align: left;
+            max-height: 450px;
+            overflow-y: auto;
+            padding-right: 5px;
         }
+        /* Estilo de la barra de scroll dentro de la lista de países para que no desentone */
+        .countries-grid::-webkit-scrollbar {
+            width: 8px;
+        }
+        .countries-grid::-webkit-scrollbar-track {
+            background: #0d1117;
+            border-radius: 4px;
+        }
+        .countries-grid::-webkit-scrollbar-thumb {
+            background: #30363d;
+            border-radius: 4px;
+        }
+
         .country-card {
             background: #0d1117;
             border: 1px solid #30363d;
@@ -73,8 +88,9 @@
             font-weight: bold;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             transition: all 0.2s;
+            font-size: 14px;
         }
         .country-card:hover {
             border-color: #00d2ff;
@@ -100,16 +116,58 @@
         <h2>Países 🌍</h2>
         <p>Selecciona un país para ver su perfil y evolución individual detallada:</p>
         
-        <!-- Ejemplo estático o dinámico de accesos directos por país -->
+        <!-- Tabla / Cuadrícula completa de países en inglés con banderas -->
         <div class="countries-grid">
-            <a href="pais.html?nombre=Spain" class="country-card">🇪🇸 España</a>
-            <a href="pais.html?nombre=Sweden" class="country-card">🇸🇪 Suecia</a>
-            <a href="pais.html?nombre=Italy" class="country-card">🇮🇹 Italia</a>
-            <a href="pais.html?nombre=France" class="country-card">🇫🇷 Francia</a>
-            <a href="pais.html?nombre=United%20Kingdom" class="country-card">🇬🇧 Reino Unido</a>
-            <a href="pais.html?nombre=Bosnia%20and%20Herzegovina" class="country-card">🇧🇦 Bosnia & Herz.</a>
-            <a href="pais.html?nombre=Germany" class="country-card">🇩🇪 Alemania</a>
-            <a href="pais.html?nombre=Ukraine" class="country-card">🇺🇦 Ucrania</a>
+            <a href="pais.html?nombre=Albania" class="country-card">🇦🇱 Albania</a>
+            <a href="pais.html?nombre=Armenia" class="country-card">🇦🇲 Armenia</a>
+            <a href="pais.html?nombre=Australia" class="country-card">🇦🇺 Australia</a>
+            <a href="pais.html?nombre=Austria" class="country-card">🇦🇹 Austria</a>
+            <a href="pais.html?nombre=Azerbaijan" class="country-card">🇦🇿 Azerbaijan</a>
+            <a href="pais.html?nombre=Belarus" class="country-card">🇧🇾 Belarus</a>
+            <a href="pais.html?nombre=Belgium" class="country-card">🇧🇪 Belgium</a>
+            <a href="pais.html?nombre=Bosnia and Herzegovina" class="country-card">🇧🇦 Bosnia and Herzegovina</a>
+            <a href="pais.html?nombre=Bulgaria" class="country-card">🇧🇬 Bulgaria</a>
+            <a href="pais.html?nombre=Croatia" class="country-card">🇭🇷 Croatia</a>
+            <a href="pais.html?nombre=Cyprus" class="country-card">🇨🇾 Cyprus</a>
+            <a href="pais.html?nombre=Czech Republic" class="country-card">🇨🇿 Czech Republic</a>
+            <a href="pais.html?nombre=Denmark" class="country-card">🇩🇰 Denmark</a>
+            <a href="pais.html?nombre=Estonia" class="country-card">🇪🇪 Estonia</a>
+            <a href="pais.html?nombre=Finland" class="country-card">🇫🇮 Finland</a>
+            <a href="pais.html?nombre=France" class="country-card">🇫🇷 France</a>
+            <a href="pais.html?nombre=Georgia" class="country-card">🇬🇪 Georgia</a>
+            <a href="pais.html?nombre=Germany" class="country-card">🇩🇪 Germany</a>
+            <a href="pais.html?nombre=Greece" class="country-card">🇬🇷 Greece</a>
+            <a href="pais.html?nombre=Hungary" class="country-card">🇭🇺 Hungary</a>
+            <a href="pais.html?nombre=Iceland" class="country-card">🇮🇸 Iceland</a>
+            <a href="pais.html?nombre=Ireland" class="country-card">🇮🇪 Ireland</a>
+            <a href="pais.html?nombre=Israel" class="country-card">🇮🇱 Israel</a>
+            <a href="pais.html?nombre=Italy" class="country-card">🇮🇹 Italy</a>
+            <a href="pais.html?nombre=Latvia" class="country-card">🇱🇻 Latvia</a>
+            <a href="pais.html?nombre=Lithuania" class="country-card">🇱🇹 Lithuania</a>
+            <a href="pais.html?nombre=Luxembourg" class="country-card">🇱🇺 Luxembourg</a>
+            <a href="pais.html?nombre=Malta" class="country-card">🇲🇹 Malta</a>
+            <a href="pais.html`" class="country-card">🇲🇩 Moldova</a>
+            <a href="pais.html?nombre=Monaco" class="country-card">🇲🇨 Monaco</a>
+            <a href="pais.html?nombre=Montenegro" class="country-card">🇲🇪 Montenegro</a>
+            <a href="pais.html?nombre=Morocco" class="country-card">🇲🇦 Morocco</a>
+            <a href="pais.html?nombre=Netherlands" class="country-card">🇳🇱 Netherlands</a>
+            <a href="pais.html?nombre=North Macedonia" class="country-card">🇲🇰 North Macedonia</a>
+            <a href="pais.html?nombre=Norway" class="country-card">🇳🇴 Norway</a>
+            <a href="pais.html?nombre=Poland" class="country-card">🇵🇱 Poland</a>
+            <a href="pais.html?nombre=Portugal" class="country-card">🇵🇹 Portugal</a>
+            <a href="pais.html?nombre=Romania" class="country-card">🇷🇴 Romania</a>
+            <a href="pais.html?nombre=Russia" class="country-card">🇷🇺 Russia</a>
+            <a href="pais.html?nombre=San Marino" class="country-card">🇸🇲 San Marino</a>
+            <a href="pais.html?nombre=Serbia" class="country-card">🇷🇸 Serbia</a>
+            <a href="pais.html?nombre=Slovakia" class="country-card">🇸🇰 Slovakia</a>
+            <a href="pais.html?nombre=Slovenia" class="country-card">🇸🇮 Slovenia</a>
+            <a href="pais.html?nombre=Spain" class="country-card">🇪🇸 Spain</a>
+            <a href="pais.html?nombre=Sweden" class="country-card">🇸🇪 Sweden</a>
+            <a href="pais.html?nombre=Switzerland" class="country-card">🇨🇭 Switzerland</a>
+            <a href="pais.html?nombre=Turkey" class="country-card">🇹🇷 Turkey</a>
+            <a href="pais.html?nombre=Ukraine" class="country-card">🇺🇦 Ukraine</a>
+            <a href="pais.html?nombre=United Kingdom" class="country-card">🇬🇧 United Kingdom</a>
+            <a href="pais.html?nombre=Yugoslavia" class="country-card">🇷🇸 Yugoslavia</a>
         </div>
     </div>
 
