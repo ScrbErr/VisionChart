@@ -123,7 +123,7 @@
                 // Hacemos fetch a la tabla de scores o festival (asumiendo que guardas el ranking/posición aquí o adaptándolo)
                 // Nota: Si tus posiciones están en la misma tabla 'scores' u otra, ajustamos el endpoint. 
                 // Aquí simularemos la estructura cruzando país y año.
-                const res = await fetch(`${SUPABASE_URL}/scores?select=country,year,score&order=year.asc`, {
+                const res = await fetch(`${SUPABASE_URL}/yearly_rankings?select=country,year,score&order=year.asc`, {
                     headers: { 
                         'apikey': SUPABASE_ANON_KEY, 
                         'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
