@@ -7,10 +7,18 @@
         body { 
             font-family: Arial, sans-serif; 
             margin: 0; 
-            padding: 20px; 
+            /* Añadimos márgenes laterales (20px arriba/abajo, 30px a los lados) */
+            padding: 20px 30px; 
             background: #0d1117; 
             color: #c9d1d9; 
         }
+        
+        /* Contenedor general para asegurar un margen máximo elegante en pantallas muy grandes */
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
         h1 { color: #00d2ff; text-align: center; margin-bottom: 5px; }
         .subtitle { text-align: center; color: #8b949e; margin-bottom: 25px; }
         
@@ -232,36 +240,41 @@
 </head>
 <body>
 
-    <a href="index.html" class="back-link">← Volver al Inicio</a>
+    <!-- Contenedor principal que envuelve todo para dar los márgenes -->
+    <div class="main-container">
 
-    <h1>Matriz de Posiciones por Festival</h1>
-    <p class="subtitle">Evolución histórica de puestos obtenidos por año (editable).</p>
+        <a href="index.html" class="back-link">← Volver al Inicio</a>
 
-    <div id="status">Cargando datos de Supabase...</div>
+        <h1>Matriz de Posiciones por Festival</h1>
+        <p class="subtitle">Evolución histórica de puestos obtenidos por año (editable).</p>
 
-    <div class="table-container">
-        <table id="yearlyTable">
-            <thead>
-                <tr id="table-headers">
-                    <th onclick="ordenarColumna(0)">Países ↕</th>
-                </tr>
-            </thead>
-            <tbody id="table-body">
-                <!-- Inyectado por JS -->
-            </tbody>
-        </table>
-    </div>
+        <div id="status">Cargando datos de Supabase...</div>
 
-    <div class="action-bar">
-        <button class="btn-update" onclick="guardarCambiosEnSupabase()">💾 ACTUALIZAR</button>
-    </div>
-
-    <!-- SECCIÓN DE ESTADÍSTICAS -->
-    <div class="stats-section">
-        <h2>Estadísticas por País</h2>
-        <div id="stats-container" class="stats-grid">
-            <!-- Inyectado por JS -->
+        <div class="table-container">
+            <table id="yearlyTable">
+                <thead>
+                    <tr id="table-headers">
+                        <th onclick="ordenarColumna(0)">Países ↕</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <!-- Inyectado por JS -->
+                </tbody>
+            </table>
         </div>
+
+        <div class="action-bar">
+            <button class="btn-update" onclick="guardarCambiosEnSupabase()">💾 ACTUALIZAR</button>
+        </div>
+
+        <!-- SECCIÓN DE ESTADÍSTICAS -->
+        <div class="stats-section">
+            <h2>Estadísticas por País</h2>
+            <div id="stats-container" class="stats-grid">
+                <!-- Inyectado por JS -->
+            </div>
+        </div>
+
     </div>
 
     <script>
