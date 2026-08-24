@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Posiciones por Festival - VisionChart</title>
+    <title>Posiciones por País - VisionChart</title>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -25,6 +25,7 @@
 
         .table-container {
             max-width: 100%;
+            max-height: 70vh;
             overflow: auto;
             border: 1px solid #30363d;
             border-radius: 8px;
@@ -45,15 +46,16 @@
             border: 1px solid #30363d;
         }
 
+        /* Primera columna fija (Años) */
         th:first-child, td:first-child {
             position: sticky;
             left: 0;
             z-index: 3;
             background-color: #161b22;
-            text-align: left;
+            text-align: center;
             font-weight: bold;
             color: #fff;
-            min-width: 160px;
+            min-width: 90px;
             border-right: 2px solid #30363d;
         }
 
@@ -62,14 +64,6 @@
             background-color: #1f242c;
             cursor: pointer;
             vertical-align: middle;
-        }
-
-        td:first-child a {
-            color: #00d2ff;
-            text-decoration: none;
-        }
-        td:first-child a:hover {
-            text-decoration: underline;
         }
 
         th {
@@ -85,14 +79,7 @@
             background-color: #30363d;
         }
 
-        .th-date {
-            display: block;
-            font-size: 10px;
-            color: #8b949e;
-            font-weight: normal;
-            margin-top: 3px;
-        }
-
+        /* Colores de posiciones */
         .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; }
         .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; }
         .pos-3 { background-color: #e08a1e !important; color: #000 !important; font-weight: bold; }
@@ -114,7 +101,7 @@
             font-weight: bold;
             font-size: 13px;
             text-align: center;
-            width: 40px;
+            width: 45px;
             outline: none;
         }
         .rank-input:focus {
@@ -153,9 +140,7 @@
             cursor: pointer;
             transition: background 0.2s;
         }
-        .btn-update:hover {
-            background-color: #2ea043;
-        }
+        .btn-update:hover { background-color: #2ea043; }
 
         @keyframes pulse-warning {
             0% { box-shadow: 0 0 0 0 rgba(224, 138, 30, 0.6); }
@@ -177,11 +162,8 @@
             font-weight: bold;
             border-radius: 6px;
             cursor: pointer;
-            transition: background 0.2s;
         }
-        .btn-undo:hover {
-            background-color: #f85149;
-        }
+        .btn-undo:hover { background-color: #f85149; }
 
         .btn-export {
             background-color: #1f6feb;
@@ -192,20 +174,11 @@
             font-weight: bold;
             border-radius: 6px;
             cursor: pointer;
-            transition: background 0.2s;
         }
-        .btn-export:hover {
-            background-color: #388bfd;
-        }
+        .btn-export:hover { background-color: #388bfd; }
 
-        .stats-section {
-            margin-top: 40px;
-        }
-        .stats-section h2 {
-            color: #00d2ff;
-            text-align: center;
-            margin-bottom: 20px;
-        }
+        .stats-section { margin-top: 40px; }
+        .stats-section h2 { color: #00d2ff; text-align: center; margin-bottom: 20px; }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -233,11 +206,10 @@
             border-radius: 3px;
             border: 1px solid #30363d;
         }
-        .card-header a {
+        .card-header span {
             font-size: 16px;
             font-weight: bold;
             color: #fff;
-            text-decoration: none;
         }
         .stats-list {
             list-style: none;
@@ -261,16 +233,16 @@
     <div class="main-container">
         <a href="index.html" class="back-link">← Volver al Inicio</a>
 
-        <h1>Matriz de Posiciones por Festival</h1>
-        <p class="subtitle">Evolución histórica de puestos obtenidos por año (editable).</p>
+        <h1>Matriz de Posiciones por País</h1>
+        <p class="subtitle">Filas por año y columnas por país (Datos de <code>country_rankings</code>).</p>
 
         <div id="status">Cargando datos de Supabase...</div>
 
         <div class="table-container">
-            <table id="yearlyTable">
+            <table id="countryTable">
                 <thead>
                     <tr id="table-headers">
-                        <th>Países ↕</th>
+                        <th>Año ↕</th>
                     </tr>
                 </thead>
                 <tbody id="table-body">
@@ -318,77 +290,250 @@
         async function cargarDatos() {
             const statusDiv = document.getElementById('status');
             try {
-                const [resRankings, resFestival] = await Promise.all([
-                    fetch(`${SUPABASE_URL}/yearly_rankings?select=country,year,rank,date`, {
-                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
-                    }),
-                    fetch(`${SUPABASE_URL}/festival?select=country,year,withdrawn`, {
-                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
-                    })
-                ]);
+                // AQUÍ ESTÁ EL CAMBIO CLAVE: USAMOS country_rankings y el campo position
+                const response = await fetch(`${SUPABASE_URL}/country_rankings?select=country,year,position`, {
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+                });
 
-                if (!resRankings.ok || !resFestival.ok) throw new Error('Error al conectar con Supabase.');
+                if (!response.ok) throw new Error('Error al conectar con Supabase en country_rankings.');
 
-                const rankings = await resRankings.json();
-                const festival = await resFestival.json();
-                
+                const data = await response.json();
                 statusDiv.textContent = "✅ Matriz cargada con éxito.";
                 statusDiv.style.color = '#3fb950';
 
-                construirMatriz(rankings, festival);
+                construirMatriz(data);
             } catch (error) {
                 statusDiv.textContent = '❌ Error: ' + error.message;
                 statusDiv.style.color = '#f85149';
             }
         }
 
-        function construirMatriz(rankings, festival) {
+        function construirMatriz(data) {
             const paisesSet = new Set();
             const anosSet = new Set();
-            
-            rankings.forEach(r => {
-                if (r.country) paisesSet.add(r.country);
-                if (r.year) anosSet.add(r.year);
-            });
-            festival.forEach(f => {
-                if (f.country) paisesSet.add(f.country);
-                if (f.year) anosSet.add(f.year);
+            const matriz = {}; // matriz[year][country] = position
+
+            data.forEach(item => {
+                if (item.country) paisesSet.add(item.country);
+                if (item.year) anosSet.add(item.year);
             });
 
             const paises = Array.from(paisesSet).sort();
-            const anos = Array.from(anosSet).sort((a, b) => a - b);
-            const matriz = {};
-            paises.forEach(p => matriz[p] = {});
+            const anos = Array.from(anosSet).sort((a, b) => b - a); // Años descendentes como en tu imagen
 
-            rankings.forEach(r => {
-                if (r.country && r.year) {
-                    matriz[r.country][r.year] = r.rank;
-                    window.valoresOriginales[`${r.country}|${r.year}`] = r.rank;
+            anos.forEach(ano => matriz[ano] = {});
+
+            data.forEach(item => {
+                if (item.country && item.year) {
+                    matriz[item.year][item.country] = item.position;
+                    window.valoresOriginales[`${item.year}|${item.country}`] = item.position;
                 }
             });
 
             window.tablaData = { paises, anos, matriz };
             renderizarTablaCompleta();
+            calcularEstadisticas(data, paises);
+        }
+
+        function obtenerClasePosicion(val) {
+            if (val === 1 || val === '1') return 'pos-1';
+            if (val === 2 || val === '2') return 'pos-2';
+            if (val === 3 || val === '3') return 'pos-3';
+            if (val === '//' || val === '-') return 'pos-none';
+            
+            const num = parseInt(val);
+            if (isNaN(num)) return 'pos-none';
+            
+            if (num >= 4 && num <= 6) return 'pos-green-dark';
+            if (num >= 7 && num <= 10) return 'pos-green-mid';
+            if (num >= 11 && num <= 13) return 'pos-green-light';
+            if (num >= 14 && num <= 16) return 'pos-orange-light';
+            if (num >= 17 && num <= 19) return 'pos-orange-std';
+            if (num >= 20 && num <= 22) return 'pos-orange-strong';
+            return 'pos-last';
         }
 
         function renderizarTablaCompleta() {
             const { paises, anos, matriz } = window.tablaData;
+            
+            // Renderizar Cabeceras (Años en la primera columna, Países en el resto)
+            const trHeaders = document.getElementById('table-headers');
+            trHeaders.innerHTML = '<th>Año ↕</th>';
+            paises.forEach(pais => {
+                let th = document.createElement('th');
+                th.textContent = pais;
+                trHeaders.appendChild(th);
+            });
+
+            // Renderizar Filas (Años)
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
 
-            paises.forEach(pais => {
+            anos.forEach(ano => {
                 let tr = document.createElement('tr');
-                let tdPais = document.createElement('td');
-                tdPais.textContent = pais;
-                tr.appendChild(tdPais);
+                let tdAno = document.createElement('td');
+                tdAno.textContent = ano;
+                tr.appendChild(tdAno);
 
-                anos.forEach(ano => {
+                paises.forEach(pais => {
                     let td = document.createElement('td');
-                    let rank = matriz[pais][ano];
-                    td.textContent = (rank !== undefined && rank !== null) ? rank : '-';
+                    let val = matriz[ano] && matriz[ano][pais] !== undefined ? matriz[ano][pais] : '';
+                    
+                    td.className = obtenerClasePosicion(val);
+
+                    let input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'rank-input';
+                    input.value = val;
+                    input.dataset.year = ano;
+                    input.dataset.country = pais;
+
+                    input.addEventListener('input', (e) => {
+                        let nuevoVal = e.target.value;
+                        let y = e.target.dataset.year;
+                        let c = e.target.dataset.country;
+                        
+                        td.className = obtenerClasePosicion(nuevoVal);
+                        
+                        let original = window.valoresOriginales[`${y}|${c}`] || '';
+                        if (String(nuevoVal) !== String(original)) {
+                            input.classList.add('modificado');
+                            window.cambiosPendientes[`${y}|${c}`] = nuevoVal;
+                        } else {
+                            input.classList.remove('modificado');
+                            delete window.cambiosPendientes[`${y}|${c}`];
+                        }
+
+                        actualizarEstadoBotonGuardar();
+                    });
+
+                    td.appendChild(input);
                     tr.appendChild(td);
                 });
                 tbody.appendChild(tr);
+            });
+        }
+
+        function actualizarEstadoBotonGuardar() {
+            const btn = document.getElementById('btnActualizar');
+            const totalCambios = Object.keys(window.cambiosPendientes).length;
+            if (totalCambios > 0) {
+                btn.classList.add('tiene-cambios');
+                btn.textContent = `💾 ACTUALIZAR (${totalCambios})`;
+            } else {
+                btn.classList.remove('tiene-cambios');
+                btn.textContent = `💾 ACTUALIZAR`;
+            }
+        }
+
+        async function guardarCambiosEnSupabase() {
+            const statusDiv = document.getElementById('status');
+            const keys = Object.keys(window.cambiosPendientes);
+            if (keys.length === 0) {
+                statusDiv.textContent = "⚠️ No hay cambios pendientes para guardar.";
+                statusDiv.style.color = '#e08a1e';
+                return;
+            }
+
+            statusDiv.textContent = "⏳ Guardando cambios en Supabase...";
+            statusDiv.style.color = '#00d2ff';
+
+            try {
+                for (let key of keys) {
+                    let [year, country] = key.split('|');
+                    let position = window.cambiosPendientes[key];
+                    if (position === '') position = null;
+
+                    const response = await fetch(`${SUPABASE_URL}/country_rankings?country=eq.${encodeURIComponent(country)}&year=eq.${year}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                            'Content-Type': 'application/json',
+                            'Prefer': 'return=minimal'
+                        },
+                        body: JSON.stringify({ position: position })
+                    });
+
+                    if (!response.ok) throw new Error(`Error al actualizar ${country} en ${year}`);
+
+                    window.valoresOriginales[key] = position;
+                }
+
+                window.cambiosPendientes = {};
+                document.querySelectorAll('.rank-input').forEach(i => i.classList.remove('modificado'));
+                actualizarEstadoBotonGuardar();
+
+                statusDiv.textContent = "✅ ¡Cambios guardados con éxito en country_rankings!";
+                statusDiv.style.color = '#3fb950';
+            } catch (err) {
+                statusDiv.textContent = "❌ Error al guardar: " + err.message;
+                statusDiv.style.color = '#f85149';
+            }
+        }
+
+        function deshacerCambios() {
+            document.querySelectorAll('.rank-input').forEach(input => {
+                let y = input.dataset.year;
+                let c = input.dataset.country;
+                let original = window.valoresOriginales[`${y}|${c}`];
+                input.value = original !== undefined && original !== null ? original : '';
+                input.classList.remove('modificado');
+                input.parentElement.className = obtenerClasePosicion(input.value);
+            });
+            window.cambiosPendientes = {};
+            actualizarEstadoBotonGuardar();
+            document.getElementById('status').textContent = "↩ Cambios descartados.";
+            document.getElementById('status').style.color = '#8b949e';
+        }
+
+        function exportarCSV() {
+            const { paises, anos, matriz } = window.tablaData;
+            let csv = 'Año,' + paises.join(',') + '\n';
+            anos.forEach(ano => {
+                let fila = [ano];
+                paises.forEach(pais => {
+                    let val = (matriz[ano] && matriz[ano][pais] !== undefined) ? matriz[ano][pais] : '';
+                    fila.value = val;
+                    fila.push(`"${val}"`);
+                });
+                csv += fila.join(',') + '\n';
+            });
+            let blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            let link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'country_rankings_matriz.csv';
+            link.click();
+        }
+
+        function calcularEstadisticas(data, paises) {
+            const container = document.getElementById('stats-container');
+            container.innerHTML = '';
+
+            paises.forEach(pais => {
+                const registros = data.filter(d => d.country === pais && d.position !== null && d.position !== '//' && d.position !== '-');
+                const posicionesValidas = registros.map(r => parseInt(r.position)).filter(p => !isNaN(p));
+
+                let totalParticipaciones = posicionesValidas.length;
+                let mejorPosicion = totalParticipaciones > 0 ? Math.min(...posicionesValidas) : '-';
+                let peorPosicion = totalParticipaciones > 0 ? Math.max(...posicionesValidas) : '-';
+                let promedio = totalParticipaciones > 0 ? (posicionesValidas.reduce((a, b) => a + b, 0) / totalParticipaciones).toFixed(1) : '-';
+
+                let card = document.createElement('div');
+                card.className = 'country-stat-card';
+                card.innerHTML = `
+                    <div class="card-header">
+                        <img src="${obtenerUrlBandera(pais)}" alt="${pais}">
+                        <span>${pais}</span>
+                    </div>
+                    <ul class="stats-list">
+                        <li><span class="label">Participaciones:</span> <span class="value">${totalParticipaciones}</span></li>
+                        <li><span class="label">Mejor Puesto:</span> <span class="value" style="color: #d4af37;">${mejorPosicion}</span></li>
+                        <li><span class="label">Peor Puesto:</span> <span class="value" style="color: #f85149;">${peorPosicion}</span></li>
+                        <li><span class="label">Promedio:</span> <span class="value highlight-avg">${promedio}</span></li>
+                    </ul>
+                `;
+                container.appendChild(card);
             });
         }
     </script>
