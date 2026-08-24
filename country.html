@@ -103,15 +103,26 @@
             width: 45px;
             outline: none;
         }
+
+        /* Ocultar flechas de incremento/decremento en inputs number */
+        .rank-input::-webkit-outer-spin-button,
+        .rank-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .rank-input[type=number] {
+            -moz-appearance: textfield;
+        }
+
         .rank-input:focus {
             background: rgba(0, 210, 255, 0.2);
             border-radius: 4px;
         }
 
         .rank-input.modificado {
-            background: rgba(224, 138, 30, 0.3);
+            background: rgba(224, 138, 30, 0.3) !important;
             border-radius: 4px;
-            border: 1px dashed #e08a1e;
+            border: 1px dashed #e08a1e !important;
         }
 
         .rank-input:disabled {
@@ -196,7 +207,7 @@
             <table id="countryTable">
                 <thead>
                     <tr id="table-headers">
-                        <th>Año ↕</th>
+                        <th onclick="ordenarAnos()">Año ↕</th>
                     </tr>
                 </thead>
                 <tbody id="table-body">
@@ -217,7 +228,8 @@
 
         window.cambiosPendientes = {};
         window.valoresOriginales = {};
-        window.ordenColumnaAsc = {}; // Para el filtrado/orden de columnas
+        window.ordenColumnaAsc = {}; 
+        window.ordenAnoAsc = false; // Por defecto año de mayor a menor
 
         async function cargarDatos() {
             const statusDiv = document.getElementById('status');
@@ -250,7 +262,7 @@
             const paisesSet = new Set();
             const anosSet = new Set();
             const matriz = {}; 
-            const retiradosMap = {}; // retiradosMap[year][country] = true/false
+            const retiradosMap = {}; 
 
             rankings.forEach(item => {
                 if (item.country) paisesSet.add(item.country);
@@ -267,14 +279,13 @@
             });
 
             const paises = Array.from(paisesSet).sort();
-            const anos = Array.from(anosSet).sort((a, b) => b - a);
+            const anos = Array.from(anosSet).sort((a, b) => b - a); // Orden inicial descendente
 
             anos.forEach(ano => matriz[ano] = {});
 
             rankings.forEach(item => {
                 if (item.country && item.year) {
                     let val = item.position;
-                    // Si está retirado en festival, forzamos '//'
                     if (retiradosMap[item.year] && retiradosMap[item.year][item.country]) {
                         val = '//';
                     }
@@ -310,7 +321,7 @@
             
             // Renderizar Cabeceras
             const trHeaders = document.getElementById('table-headers');
-            trHeaders.innerHTML = '<th>Año ↕</th>';
+            trHeaders.innerHTML = '<th onclick="ordenarAnos()">Año ↕</th>';
             paises.forEach(pais => {
                 let th = document.createElement('th');
                 th.textContent = pais + ' ↕';
@@ -328,7 +339,6 @@
                 tdAno.textContent = ano;
                 tr.appendChild(tdAno);
 
-                // Calcular máximo de países participantes activos en este año
                 let activosEnAno = paises.filter(p => {
                     let v = matriz[ano] && matriz[ano][p];
                     return v !== undefined && v !== '' && v !== '//' && v !== '-';
@@ -364,6 +374,12 @@
                         handleInputChange(e, activosEnAno);
                     });
 
+                    // Restaurar clase modificado si ya estaba cambiado previamente
+                    let key = `${ano}|${pais}`;
+                    if (window.cambiosPendientes[key] !== undefined) {
+                        input.classList.add('modificado');
+                    }
+
                     td.appendChild(input);
                     tr.appendChild(td);
                 });
@@ -387,19 +403,17 @@
             let matrizAno = window.tablaData.matriz[y];
             let viejoVal = parseInt(matrizAno[c]);
 
-            // Lógica de desplazamiento automático (Shift positions)
+            // Lógica de desplazamiento automático (Shift positions) sin duplicados
             if (!isNaN(viejoVal) && viejoVal !== nuevoVal) {
                 for (let paisKey in matrizAno) {
                     if (paisKey === c) continue;
                     let pVal = parseInt(matrizAno[paisKey]);
                     if (!isNaN(pVal)) {
                         if (viejoVal < nuevoVal) {
-                            // Movido hacia abajo: los que estaban entre viejo y nuevo suben 1
                             if (pVal > viejoVal && pVal <= nuevoVal) {
                                 matrizAno[paisKey] = pVal - 1;
                             }
                         } else {
-                            // Movido hacia arriba: los que estaban entre nuevo y viejo bajan 1
                             if (pVal >= nuevoVal && pVal < viejoVal) {
                                 matrizAno[paisKey] = pVal + 1;
                             }
@@ -410,7 +424,7 @@
 
             matrizAno[c] = nuevoVal;
 
-            // Actualizar todos los inputs y celdas de esta fila en pantalla
+            // Actualizar todos los inputs y celdas de esta fila en pantalla de manera precisa
             document.querySelectorAll(`input[data-year="${y}"]`).forEach(inp => {
                 let p = inp.dataset.country;
                 let valActual = matrizAno[p];
@@ -418,13 +432,15 @@
                     inp.value = valActual;
                     inp.parentElement.className = obtenerClasePosicion(valActual);
                     
-                    let original = window.valoresOriginales[`${y}|${p}`] || '';
+                    let original = window.valoresOriginales[`${y}|${p}`] !== undefined ? window.valoresOriginales[`${y}|${p}`] : '';
+                    let key = `${y}|${p}`;
+
                     if (String(valActual) !== String(original)) {
                         inp.classList.add('modificado');
-                        window.cambiosPendientes[`${y}|${p}`] = valActual;
+                        window.cambiosPendientes[key] = valActual;
                     } else {
                         inp.classList.remove('modificado');
-                        delete window.cambiosPendientes[`${y}|${p}`];
+                        delete window.cambiosPendientes[key];
                     }
                 }
             });
@@ -432,21 +448,35 @@
             actualizarEstadoBotonGuardar();
         }
 
+        function ordenarAnos() {
+            const { anos, matriz } = window.tablaData;
+            window.ordenAnoAsc = !window.ordenAnoAsc;
+            anos.sort((a, b) => {
+                return window.ordenAnoAsc ? a - b : b - a;
+            });
+            renderizarTablaCompleta();
+        }
+
         function ordenarColumna(pais) {
-            const { paises, anos, matriz } = window.tablaData;
+            const { anos, matriz } = window.tablaData;
             let asc = window.ordenColumnaAsc[pais] = !window.ordenColumnaAsc[pais];
 
             anos.sort((a, b) => {
-                let vA = matriz[a] && matriz[a][pais] !== undefined ? matriz[a][pais] : 999;
-                let vB = matriz[b] && matriz[b][pais] !== undefined ? matriz[b][pais] : 999;
+                let vA = matriz[a] && matriz[a][pais] !== undefined ? matriz[a][pais] : '//';
+                let vB = matriz[b] && matriz[b][pais] !== undefined ? matriz[b][pais] : '//';
                 
-                if (vA === '//') vA = 999;
-                if (vB === '//') vB = 999;
+                // Los retirados (//) van siempre al fondo independientemente del orden asc/desc
+                let isAWdrawn = (vA === '//' || vA === '');
+                let isBWdrawn = (vB === '//' || vB === '');
 
-                vA = parseInt(vA) || 999;
-                vB = parseInt(vB) || 999;
+                if (isAWdrawn && isBWdrawn) return 0;
+                if (isAWdrawn) return 1;
+                if (isBWdrawn) return -1;
 
-                return asc ? vA - vB : vB - vA;
+                let numA = parseInt(vA);
+                let numB = parseInt(vB);
+
+                return asc ? numA - numB : numB - numA;
             });
 
             renderizarTablaCompleta();
@@ -518,6 +548,7 @@
                 input.value = original !== undefined && original !== null ? original : '';
                 input.classList.remove('modificado');
                 input.parentElement.className = obtenerClasePosicion(input.value);
+                window.tablaData.matriz[y][c] = input.value;
             });
             window.cambiosPendientes = {};
             actualizarEstadoBotonGuardar();
