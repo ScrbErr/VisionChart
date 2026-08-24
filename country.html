@@ -229,7 +229,7 @@
         window.cambiosPendientes = {};
         window.valoresOriginales = {};
         window.ordenColumnaAsc = {}; 
-        window.ordenAnoAsc = false; // Por defecto año de mayor a menor
+        window.ordenAnoAsc = false;
 
         async function cargarDatos() {
             const statusDiv = document.getElementById('status');
@@ -279,7 +279,7 @@
             });
 
             const paises = Array.from(paisesSet).sort();
-            const anos = Array.from(anosSet).sort((a, b) => b - a); // Orden inicial descendente
+            const anos = Array.from(anosSet).sort((a, b) => b - a);
 
             anos.forEach(ano => matriz[ano] = {});
 
@@ -319,7 +319,6 @@
         function renderizarTablaCompleta() {
             const { paises, anos, matriz, retiradosMap } = window.tablaData;
             
-            // Renderizar Cabeceras
             const trHeaders = document.getElementById('table-headers');
             trHeaders.innerHTML = '<th onclick="ordenarAnos()">Año ↕</th>';
             paises.forEach(pais => {
@@ -329,7 +328,6 @@
                 trHeaders.appendChild(th);
             });
 
-            // Renderizar Filas
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
 
@@ -339,10 +337,15 @@
                 tdAno.textContent = ano;
                 tr.appendChild(tdAno);
 
-                let activosEnAno = paises.filter(p => {
+                // Calcular cuántos países participan realmente este año (excluyendo vacíos y retirados)
+                let activosEnAno = 0;
+                paises.forEach(p => {
                     let v = matriz[ano] && matriz[ano][p];
-                    return v !== undefined && v !== '' && v !== '//' && v !== '-';
-                }).length;
+                    let isW = retiradosMap[ano] && retiradosMap[ano][p];
+                    if (v !== undefined && v !== '' && v !== null && !isW) {
+                        activosEnAno++;
+                    }
+                });
                 if (activosEnAno < 1) activosEnAno = paises.length;
 
                 paises.forEach(pais => {
@@ -374,7 +377,6 @@
                         handleInputChange(e, activosEnAno);
                     });
 
-                    // Restaurar clase modificado si ya estaba cambiado previamente
                     let key = `${ano}|${pais}`;
                     if (window.cambiosPendientes[key] !== undefined) {
                         input.classList.add('modificado');
@@ -401,55 +403,28 @@
             input.value = nuevoVal;
 
             let matrizAno = window.tablaData.matriz[y];
-            let viejoVal = parseInt(matrizAno[c]);
-
-            // Lógica de desplazamiento automático (Shift positions) sin duplicados
-            if (!isNaN(viejoVal) && viejoVal !== nuevoVal) {
-                for (let paisKey in matrizAno) {
-                    if (paisKey === c) continue;
-                    let pVal = parseInt(matrizAno[paisKey]);
-                    if (!isNaN(pVal)) {
-                        if (viejoVal < nuevoVal) {
-                            if (pVal > viejoVal && pVal <= nuevoVal) {
-                                matrizAno[paisKey] = pVal - 1;
-                            }
-                        } else {
-                            if (pVal >= nuevoVal && pVal < viejoVal) {
-                                matrizAno[paisKey] = pVal + 1;
-                            }
-                        }
-                    }
-                }
-            }
-
             matrizAno[c] = nuevoVal;
 
-            // Actualizar todos los inputs y celdas de esta fila en pantalla de manera precisa
-            document.querySelectorAll(`input[data-year="${y}"]`).forEach(inp => {
-                let p = inp.dataset.country;
-                let valActual = matrizAno[p];
-                if (valActual !== undefined) {
-                    inp.value = valActual;
-                    inp.parentElement.className = obtenerClasePosicion(valActual);
-                    
-                    let original = window.valoresOriginales[`${y}|${p}`] !== undefined ? window.valoresOriginales[`${y}|${p}`] : '';
-                    let key = `${y}|${p}`;
+            // Actualizar solo la celda modificada sin alterar el resto de columnas de forma automática
+            let valActual = nuevoVal;
+            input.parentElement.className = obtenerClasePosicion(valActual);
+            
+            let original = window.valoresOriginales[`${y}|${c}`] !== undefined ? window.valoresOriginales[`${y}|${c}`] : '';
+            let key = `${y}|${c}`;
 
-                    if (String(valActual) !== String(original)) {
-                        inp.classList.add('modificado');
-                        window.cambiosPendientes[key] = valActual;
-                    } else {
-                        inp.classList.remove('modificado');
-                        delete window.cambiosPendientes[key];
-                    }
-                }
-            });
+            if (String(valActual) !== String(original)) {
+                input.classList.add('modificado');
+                window.cambiosPendientes[key] = valActual;
+            } else {
+                input.classList.remove('modificado');
+                delete window.cambiosPendientes[key];
+            }
 
             actualizarEstadoBotonGuardar();
         }
 
         function ordenarAnos() {
-            const { anos, matriz } = window.tablaData;
+            const { anos } = window.tablaData;
             window.ordenAnoAsc = !window.ordenAnoAsc;
             anos.sort((a, b) => {
                 return window.ordenAnoAsc ? a - b : b - a;
@@ -465,7 +440,6 @@
                 let vA = matriz[a] && matriz[a][pais] !== undefined ? matriz[a][pais] : '//';
                 let vB = matriz[b] && matriz[b][pais] !== undefined ? matriz[b][pais] : '//';
                 
-                // Los retirados (//) van siempre al fondo independientemente del orden asc/desc
                 let isAWdrawn = (vA === '//' || vA === '');
                 let isBWdrawn = (vB === '//' || vB === '');
 
