@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Posiciones por Festival - VisionChart</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #0d1117; 
+            color: #c9d1d9; 
+        }
+        h1 { color: #00d2ff; text-align: center; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #8b949e; margin-bottom: 25px; }
+        
+        .back-link { display: inline-block; margin-bottom: 15px; color: #00d2ff; text-decoration: none; font-weight: bold; }
+        .back-link:hover { text-decoration: underline; }
+
+        .table-container {
+            max-width: 100%;
+            overflow-x: auto;
+            max-height: 80vh;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            background: #161b22;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        th, td {
+            padding: 8px 12px;
+            border: 1px solid #30363d;
+        }
+
+        /* Columna fija de Países a la izquierda */
+        th:first-child, td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 3;
+            background-color: #161b22;
+            text-align: left;
+            font-weight: bold;
+            color: #fff;
+            min-width: 160px;
+            border-right: 2px solid #30363d;
+        }
+
+        th:first-child {
+            z-index: 4;
+            background-color: #1f242c;
+            cursor: pointer;
+        }
+
+        th {
+            background-color: #1f242c;
+            color: #00d2ff;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            cursor: pointer;
+            user-select: none;
+        }
+        th:hover {
+            background-color: #30363d;
+        }
+
+        /* Clases de colores según la posición (inspirado en tu imagen) */
+        .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; } /* Oro */
+        .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; } /* Plata */
+        .pos-3 { background-color: #cd7f32 !important; color: #000 !important; font-weight: bold; } /* Bronce */
+        
+        .pos-green-dark { background-color: #2ea043; color: #fff; }   /* 4 - 5 */
+        .pos-green-mid  { background-color: #3fb950; color: #000; }   /* 6 - 10 */
+        .pos-green-light{ background-color: #56d364; color: #000; }   /* 11 - 26 */
+        
+        .pos-orange-light { background-color: #db6d28; color: #fff; } /* 27 - 30 */
+        .pos-orange-std   { background-color: #bc4c00; color: #fff; } /* 30+ */
+        .pos-orange-strong{ background-color: #9e2a2b; color: #fff; } /* Últimos 5 */
+        
+        .pos-none { background-color: #21262d; color: #8b949e; }      /* No participa // */
+
+        #status { text-align: center; font-weight: bold; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+    <a href="index.html" class="back-link">← Volver al Inicio</a>
+
+    <h1>Matriz de Posiciones por Festival</h1>
+    <p class="subtitle">Evolución histórica de puestos obtenidos por año.</p>
+
+    <div id="status">Cargando datos de posiciones...</div>
+
+    <div class="table-container">
+        <table id="yearlyTable">
+            <thead>
+                <tr id="table-headers">
+                    <th>Países ↕</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <!-- Los datos se inyectarán por JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1';
+        const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
+
+        async function cargarMatrizPosiciones() {
+            const statusDiv = document.getElementById('status');
+            
+            try {
+                // Hacemos fetch a la tabla de scores o festival (asumiendo que guardas el ranking/posición aquí o adaptándolo)
+                // Nota: Si tus posiciones están en la misma tabla 'scores' u otra, ajustamos el endpoint. 
+                // Aquí simularemos la estructura cruzando país y año.
+                const res = await fetch(`${SUPABASE_URL}/scores?select=country,year,score&order=year.asc`, {
+                    headers: { 
+                        'apikey': SUPABASE_ANON_KEY, 
+                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+                    }
+                });
+
+                if (!res.ok) throw new Error('Error al conectar con la base de datos.');
+
+                const data = await res.json();
+                
+                statusDiv.textContent = "✅ Matriz cargada con éxito.";
+                statusDiv.style.color = '#3fb950';
+
+                // Aquí procesaremos los datos para construir la tabla cruzada filas (países) y columnas (años)
+                construirTabla(data);
+
+            } catch (error) {
+                statusDiv.textContent = '❌ Error: ' + error.message;
+                statusDiv.style.color = '#f85149';
+                console.error(error);
+            }
+        }
+
+        function obtenerClasePosicion(pos, totalParticipantesAnio) {
+            if (pos === null || pos === undefined || isNaN(pos)) return 'pos-none';
+            if (pos === 1) return 'pos-1';
+            if (pos === 2) return 'pos-2';
+            if (pos === 3) return 'pos-3';
+            if (pos >= 4 && pos <= 5) return 'pos-green-dark';
+            if (pos >= 6 && pos <= 10) return 'pos-green-mid';
+            if (pos >= 11 && pos <= 26) return 'pos-green-light';
+            if (pos >= 27 && pos <= 30) return 'pos-orange-light';
+            
+            // Si está entre los últimos 5 del año
+            if (pos >= totalParticipantesAnio - 4) return 'pos-orange-strong';
+            
+            return 'pos-orange-std';
+        }
+
+        function construirTabla(data) {
+            // Lógica preliminar de estructuración por país y año para pintar la tabla cruzada
+            // ...
+        }
+
+        cargarMatrizPosiciones();
+    </script>
+
+</body>
+</html>
