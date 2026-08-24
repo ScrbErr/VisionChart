@@ -60,6 +60,14 @@
             vertical-align: middle;
         }
 
+        td:first-child a {
+            color: #00d2ff;
+            text-decoration: none;
+        }
+        td:first-child a:hover {
+            text-decoration: underline;
+        }
+
         /* Cabecera superior fija */
         th {
             background-color: #1f242c;
@@ -95,7 +103,7 @@
         .pos-orange-std   { background-color: #bc4c00; color: #fff; } 
         .pos-orange-strong{ background-color: #9e2a2b; color: #fff; } 
         .pos-last         { background-color: #7f1d1d !important; color: #fff !important; font-weight: bold; } 
-        .pos-none { background-color: #21262d; color: #8b949e; }      
+        .pos-none { background-color: #21262d; color: #8b949e; }     
 
         .rank-input {
             background: transparent;
@@ -148,6 +156,78 @@
         .btn-update:hover {
             background-color: #2ea043;
         }
+
+        /* SECCIÓN NUEVA DE ESTADÍSTICAS */
+        .stats-section {
+            margin-top: 40px;
+        }
+        .stats-section h2 {
+            color: #00d2ff;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .country-stat-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 8px;
+        }
+        .card-header img {
+            width: 32px;
+            height: 22px;
+            object-fit: cover;
+            border-radius: 3px;
+            border: 1px solid #30363d;
+        }
+        .card-header a {
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
+            text-decoration: none;
+        }
+        .card-header a:hover {
+            color: #00d2ff;
+            text-decoration: underline;
+        }
+        .stats-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            font-size: 13px;
+        }
+        .stats-list li {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px dashed #21262d;
+        }
+        .stats-list li:last-child {
+            border-bottom: none;
+        }
+        .stats-list .label {
+            color: #8b949e;
+        }
+        .stats-list .value {
+            font-weight: bold;
+            color: #c9d1d9;
+        }
+        .stats-list .highlight-avg {
+            color: #00d2ff;
+        }
     </style>
 </head>
 <body>
@@ -176,14 +256,41 @@
         <button class="btn-update" onclick="guardarCambiosEnSupabase()">💾 ACTUALIZAR</button>
     </div>
 
+    <!-- SECCIÓN NUEVA DE ESTADÍSTICAS -->
+    <div class="stats-section">
+        <h2>Estadísticas por País</h2>
+        <div id="stats-container" class="stats-grid">
+            <!-- Inyectado por JS -->
+        </div>
+    </div>
+
     <script>
         const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1';
         const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
 
-        // OBJETO PARA RASTREAR SOLO LOS CAMBIOS REALIZADOS (clave: "pais|ano", valor: nuevoRank)
+        // OBJETO PARA RASTREAR SOLO LOS CAMBIOS REALIZADOS
         window.cambiosPendientes = {};
-        // OBJETO PARA GUARDAR EL VALOR ORIGINAL CON EL QUE SE CARGO LA MATRIZ
         window.valoresOriginales = {};
+
+        // Mapeo básico de nombres de países a códigos ISO de 2 letras para banderas (FlagCDN)
+        const countryCodes = {
+            "España": "es", "Albania": "al", "Alemania": "de", "Andorra": "ad", "Armenia": "am",
+            "Australia": "au", "Austria": "at", "Azerbaiyán": "az", "Bélgica": "be", "Bielorrusia": "by",
+            "Bosnia y Herzegovina": "ba", "Bulgaria": "bg", "Chipre": "cy", "Croacia": "hr", "Dinamarca": "dk",
+            "Eslovaquia": "sk", "Eslovenia": "si", "Estonia": "ee", "Finlandia": "fi", "Francia": "fr",
+            "Georgia": "ge", "Grecia": "gr", "Hungría": "hu", "Irlanda": "ie", "Islandia": "is",
+            "Israel": "il", "Italia": "it", "Letonia": "lv", "Lituania": "lt", "Macedonia del Norte": "mk",
+            "Malta": "mt", "Moldavia": "md", "Mónaco": "mc", "Montenegro": "me", "Noruega": "no",
+            "Países Bajos": "nl", "Polonia": "pl", "Portugal": "pt", "Reino Unido": "gb", "República Checa": "cz",
+            "Rumanía": "ro", "Rusia": "ru", "San Marino": "sm", "Serbia": "rs", "Suecia": "se",
+            "Suiza": "ch", "Turquía": "tr", "Ucrania": "ua", "Australia": "au", "Marruecos": "ma",
+            "Serbia y Montenegro": "cs", "Yugoslavia": "yu"
+        };
+
+        function obtenerUrlBandera(pais) {
+            const code = countryCodes[pais] ? countryCodes[pais] : "un";
+            return `https://flagcdn.com/w40/${code}.png`;
+        }
 
         function registrarCambio(pais, ano, valor) {
             const key = `${pais}|${ano}`;
@@ -272,6 +379,7 @@
             window.tablaData = { paises, anos, matriz, retiradas, fechasPorAnio };
             window.cambiosPendientes = {}; 
             renderizarCabecerasYTabla();
+            renderizarEstadisticas();
         }
 
         function renderizarCabecerasYTabla() {
@@ -280,14 +388,12 @@
             const trHeaders = document.getElementById('table-headers');
             trHeaders.innerHTML = '';
             
-            // Renderizar cabecera de Países con su indicador de orden
             let arrowPais = '↕';
             if (currentSortColumn === 0) {
                 arrowPais = sortDirection ? '↓' : '↑';
             }
             trHeaders.innerHTML += `<th onclick="ordenarColumna(0)">Países <span id="sort-arrow-0">${arrowPais}</span></th>`;
             
-            // Renderizar cabeceras de Años con sus indicadores de orden
             anos.forEach((ano, index) => {
                 let colIdx = index + 1;
                 let arrowAno = '↕';
@@ -333,7 +439,13 @@
             paises.forEach(pais => {
                 let tr = document.createElement('tr');
                 let tdPais = document.createElement('td');
-                tdPais.textContent = pais;
+                
+                // Enlace al nombre del país requerido
+                let aPais = document.createElement('a');
+                aPais.href = `pais.html?nombre=${encodeURIComponent(pais)}`;
+                aPais.textContent = pais;
+                tdPais.appendChild(aPais);
+
                 tr.appendChild(tdPais);
 
                 anos.forEach(ano => {
@@ -370,6 +482,7 @@
                                 matriz[pais][ano] = null;
                                 registrarCambio(pais, ano, null);
                                 renderizarTablaCompleta();
+                                renderizarEstadisticas();
                                 return;
                             }
 
@@ -428,6 +541,7 @@
                             });
 
                             renderizarTablaCompleta();
+                            renderizarEstadisticas();
                         });
 
                         td.appendChild(input);
@@ -438,6 +552,66 @@
                     tr.appendChild(td);
                 });
                 tbody.appendChild(tr);
+            });
+        }
+
+        // FUNCIÓN NUEVA PARA RENDERIZAR LAS ESTADÍSTICAS ABAJO
+        function renderizarEstadisticas() {
+            const { paises, anos, matriz, retiradas } = window.tablaData;
+            const { maxRangoPorAnio } = calcularMaximosYParticipantes(paises, anos, matriz, retiradas);
+            const statsContainer = document.getElementById('stats-container');
+            statsContainer.innerHTML = '';
+
+            paises.forEach(pais => {
+                let top1 = 0, top2 = 0, top3 = 0, top5 = 0, top10 = 0, top26 = 0, fuera27Plus = 0, bottom5 = 0;
+                let sumaRanks = 0;
+                let totalParticipaciones = 0;
+
+                anos.forEach(ano => {
+                    let isWithdrawn = retiradas[pais] && retiradas[pais][ano] === true;
+                    if (isWithdrawn) return;
+
+                    let rank = matriz[pais][ano];
+                    if (rank !== undefined && rank !== null && !isNaN(rank)) {
+                        totalParticipaciones++;
+                        sumaRanks += rank;
+
+                        if (rank === 1) top1++;
+                        if (rank <= 2) top2++;
+                        if (rank <= 3) top3++;
+                        if (rank <= 5) top5++;
+                        if (rank <= 10) top10++;
+                        if (rank <= 26) top26++;
+
+                        let maxR = maxRangoPorAnio[ano] || 25;
+                        if (rank >= 27) fuera27Plus++;
+                        if (rank >= maxR - 4 && maxR >= 5) bottom5++;
+                    }
+                });
+
+                let media = totalParticipaciones > 0 ? (sumaRanks / totalParticipaciones).toFixed(2) : '-';
+                let flagUrl = obtenerUrlBandera(pais);
+
+                let card = document.createElement('div');
+                card.className = 'country-stat-card';
+                card.innerHTML = `
+                    <div class="card-header">
+                        <img src="${flagUrl}" alt="Bandera ${pais}" onerror="this.src='https://flagcdn.com/w40/un.png'">
+                        <a href="pais.html?nombre=${encodeURIComponent(pais)}">${pais}</a>
+                    </div>
+                    <ul class="stats-list">
+                        <li><span class="label">Top 1:</span> <span class="value">${top1}</span></li>
+                        <li><span class="label">Top 2:</span> <span class="value">${top2}</span></li>
+                        <li><span class="label">Top 3:</span> <span class="value">${top3}</span></li>
+                        <li><span class="label">Top 5:</span> <span class="value">${top5}</span></li>
+                        <li><span class="label">Top 10:</span> <span class="value">${top10}</span></li>
+                        <li><span class="label">Top 26:</span> <span class="value">${top26}</span></li>
+                        <li><span class="label">Fuera (27-última):</span> <span class="value">${fuera27Plus}</span></li>
+                        <li><span class="label">Bottom 5:</span> <span class="value">${bottom5}</span></li>
+                        <li><span class="label">Media de posición:</span> <span class="value highlight-avg">${media}</span></li>
+                    </ul>
+                `;
+                statsContainer.appendChild(card);
             });
         }
 
@@ -514,6 +688,7 @@
                 window.cambiosPendientes = {};
                 
                 renderizarCabecerasYTabla();
+                renderizarEstadisticas();
 
                 statusDiv.textContent = `✅ ¡${registrosParaGuardar.length} posiciones actualizadas con éxito (${hoy})!`;
                 statusDiv.style.color = '#3fb950';
@@ -581,13 +756,11 @@
                     if (isMissingA && isMissingB) return 0;
                 }
 
-                // CORRECCIÓN: Invertir adecuadamente según la dirección (ascendente/descendente)
                 if (valA < valB) return sortDirection ? 1 : -1;
                 if (valA > valB) return sortDirection ? -1 : 1;
                 return 0;
             });
 
-            // Redibujar cabeceras para actualizar las flechas visuales e imprimir la tabla ordenada
             renderizarCabecerasYTabla();
         }
 
