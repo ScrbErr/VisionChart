@@ -85,7 +85,7 @@
         .pos-orange-light { background-color: #db6d28; color: #fff; } /* 27 - 30 */
         .pos-orange-std   { background-color: #bc4c00; color: #fff; } /* 30+ */
         .pos-orange-strong{ background-color: #9e2a2b; color: #fff; } /* Últimos 5 */
-        .pos-last         { background-color: #654321 !important; color: #fff !important; font-weight: bold; } /* Último puesto (amarronado) */
+        .pos-last         { background-color: #654321 !important; color: #fff !important; font-weight: bold; } /* Último puesto */
         
         .pos-none { background-color: #21262d; color: #8b949e; }      /* No participa // */
 
@@ -175,6 +175,10 @@
                 if (r.country) paisesSet.add(r.country);
                 if (r.year) anosSet.add(r.year);
             });
+            festival.forEach(f => {
+                if (f.country) paisesSet.add(f.country);
+                if (f.year) anosSet.add(f.year);
+            });
 
             const paises = Array.from(paisesSet).sort();
             const anos = Array.from(anosSet).sort((a, b) => a - b);
@@ -196,28 +200,42 @@
                 }
             });
 
-            // Calcular el rango máximo (peor puesto real) y mínimo por año
-            const maxRangoPorAnio = {};
-            anos.forEach(ano => {
-                let maxR = 0;
-                paises.forEach(p => {
-                    let r = matriz[p][ano];
-                    if (r && r > maxR) maxR = r;
-                });
-                maxRangoPorAnio[ano] = maxR;
-            });
-
             const trHeaders = document.getElementById('table-headers');
             trHeaders.innerHTML = '<th onclick="ordenarColumna(0)">Países ↕</th>';
             anos.forEach((ano, index) => {
                 trHeaders.innerHTML += `<th onclick="ordenarColumna(${index + 1})">${ano} ↕</th>`;
             });
 
-            window.tablaData = { paises, anos, matriz, retiradas, maxRangoPorAnio };
-            renderizarCuerpo(paises, anos, matriz, retiradas, maxRangoPorAnio);
+            window.tablaData = { paises, anos, matriz, retiradas };
+            renderizarTablaCompleta();
         }
 
-        function renderizarCuerpo(paises, anos, matriz, retiradas, maxRangoPorAnio) {
+        function calcularMaximosYParticipantes(paises, anos, matriz, retiradas) {
+            const maxRangoPorAnio = {};
+            const totalParticipantesPorAnio = {};
+
+            anos.forEach(ano => {
+                let maxR = 0;
+                let count = 0;
+                paises.forEach(p => {
+                    let isWithdrawn = retiradas[p] && retiradas[p][ano] === true;
+                    if (!isWithdrawn) {
+                        count++;
+                        let r = matriz[p][ano];
+                        if (r && r > maxR) maxR = r;
+                    }
+                });
+                maxRangoPorAnio[ano] = maxR > 0 ? maxR : count;
+                totalParticipantesPorAnio[ano] = count;
+            });
+
+            return { maxRangoPorAnio, totalParticipantesPorAnio };
+        }
+
+        function renderizarTablaCompleta() {
+            const { paises, anos, matriz, retiradas } = window.tablaData;
+            const { maxRangoPorAnio, totalParticipantesPorAnio } = calcularMaximosYParticipantes(paises, anos, matriz, retiradas);
+
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
 
@@ -231,34 +249,40 @@
                     let td = document.createElement('td');
                     let rank = matriz[pais][ano];
                     let isWithdrawn = retiradas[pais] && retiradas[pais][ano] === true;
-                    let maxR = maxRangoPorAnio[ano] || 25;
+                    let maxAllowed = totalParticipantesPorAnio[ano] || 25;
+                    let maxR = maxRangoPorAnio[ano] || maxAllowed;
 
-                    if (isWithdrawn || rank === null || rank === undefined || isNaN(rank)) {
+                    if (isWithdrawn) {
                         td.textContent = '//';
                         td.className = 'pos-none';
                     } else {
-                        // Creamos un input para permitir la edición local
                         let input = document.createElement('input');
-                        input.type = 'text';
-                        input.value = rank;
+                        input.type = 'number';
+                        input.min = '1';
+                        input.max = maxAllowed;
+                        input.value = (rank !== undefined && rank !== null && !isNaN(rank)) ? rank : '';
                         input.className = 'rank-input';
                         
-                        // Actualizar en tiempo real el valor en la matriz local al escribir
                         input.addEventListener('input', (e) => {
                             let val = parseInt(e.target.value);
-                            matriz[pais][ano] = isNaN(val) ? null : val;
-                            // Recalcular el maxR por si acaso cambia drásticamente
-                            let maxRNew = 0;
-                            paises.forEach(p => {
-                                let r = matriz[p][ano];
-                                if (r && r > maxRNew) maxRNew = r;
-                            });
-                            maxRangoPorAnio[ano] = maxRNew;
-                            td.className = obtenerClasePosicion(val, maxRNew);
+                            
+                            if (isNaN(e.target.value) || e.target.value === '') {
+                                matriz[pais][ano] = null;
+                            } else {
+                                if (val < 1) val = 1;
+                                if (val > maxAllowed) val = maxAllowed;
+                                input.value = val;
+                                matriz[pais][ano] = val;
+                            }
+
+                            // Refrescar colores de toda la columna dinámicamente
+                            actualizarColoresColumna(ano);
                         });
 
                         td.appendChild(input);
-                        td.className = obtenerClasePosicion(rank, maxR);
+                        td.className = (rank !== undefined && rank !== null && !isNaN(rank)) 
+                            ? obtenerClasePosicion(rank, maxR) 
+                            : 'pos-none';
                     }
                     tr.appendChild(td);
                 });
@@ -266,11 +290,34 @@
             });
         }
 
+        function actualizarColoresColumna(anoTarget) {
+            const { paises, anos, matriz, retiradas } = window.tablaData;
+            const { maxRangoPorAnio } = calcularMaximosYParticipantes(paises, anos, matriz, retiradas);
+            let anoIndex = anos.indexOf(anoTarget);
+            if (anoIndex === -1) return;
+
+            const rows = document.getElementById('table-body').rows;
+            let maxR = maxRangoPorAnio[anoTarget];
+
+            for (let i = 0; i < rows.length; i++) {
+                let pais = paises[i];
+                let td = rows[i].cells[anoIndex + 1];
+                let rank = matriz[pais][anoTarget];
+                let isWithdrawn = retiradas[pais] && retiradas[pais][anoTarget] === true;
+
+                if (!isWithdrawn && rank !== undefined && rank !== null && !isNaN(rank)) {
+                    td.className = obtenerClasePosicion(rank, maxR);
+                } else if (!isWithdrawn) {
+                    td.className = 'pos-none';
+                }
+            }
+        }
+
         function obtenerClasePosicion(pos, maxRangoAnio) {
             if (pos === 1) return 'pos-1';
             if (pos === 2) return 'pos-2';
             if (pos === 3) return 'pos-3';
-            if (pos === maxRangoAnio && maxRangoAnio > 3) return 'pos-last'; // El último puesto exacto (amarronado)
+            if (pos === maxRangoAnio && maxRangoAnio > 3) return 'pos-last'; 
             if (pos >= 4 && pos <= 5) return 'pos-green-dark';
             if (pos >= 6 && pos <= 10) return 'pos-green-mid';
             if (pos >= 11 && pos <= 26) return 'pos-green-light';
@@ -280,7 +327,7 @@
         }
 
         function ordenarColumna(colIndex) {
-            const { paises, anos, matriz, retiradas, maxRangoPorAnio } = window.tablaData;
+            const { paises, anos, matriz, retiradas } = window.tablaData;
             
             if (currentSortColumn === colIndex) {
                 sortDirection = !sortDirection; 
@@ -291,19 +338,36 @@
 
             paises.sort((a, b) => {
                 let valA, valB;
+                let isMissingA = false, isMissingB = false;
+
                 if (colIndex === 0) {
                     valA = a.toLowerCase();
                     valB = b.toLowerCase();
                 } else {
                     let ano = anos[colIndex - 1];
-                    // Asignamos un valor muy alto (9999) a los que no tienen ranking o están retirados para que queden abajo
+                    
                     let rA = matriz[a][ano];
                     let isWitA = retiradas[a] && retiradas[a][ano] === true;
-                    valA = (!isWitA && rA !== undefined && rA !== null && !isNaN(rA)) ? rA : 9999;
+                    if (isWitA || rA === undefined || rA === null || isNaN(rA)) {
+                        isMissingA = true;
+                    } else {
+                        valA = rA;
+                    }
 
                     let rB = matriz[b][ano];
                     let isWitB = retiradas[b] && retiradas[b][ano] === true;
-                    valB = (!isWitB && rB !== undefined && rB !== null && !isNaN(rB)) ? rB : 9999;
+                    if (isWitB || rB === undefined || rB === null || isNaN(rB)) {
+                        isMissingB = true;
+                    } else {
+                        valB = rB;
+                    }
+                }
+
+                // Forzar siempre que los vacíos o retirados vayan al fondo sin importar la dirección del orden
+                if (colIndex !== 0) {
+                    if (isMissingA && !isMissingB) return 1;
+                    if (!isMissingA && isMissingB) return -1;
+                    if (isMissingA && isMissingB) return 0;
                 }
 
                 if (valA < valB) return sortDirection ? 1 : -1;
@@ -311,7 +375,7 @@
                 return 0;
             });
 
-            renderizarCuerpo(paises, anos, matriz, retiradas, maxRangoPorAnio);
+            renderizarTablaCompleta();
         }
 
         cargarDatos();
