@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Posiciones por Festival - VisionChart</title>
+    <!-- Incluimos Chart.js desde CDN para las gráficas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -20,7 +22,7 @@
         .table-container {
             max-width: 100%;
             overflow: auto;
-            max-height: 70vh;
+            max-height: 60vh;
             border: 1px solid #30363d;
             border-radius: 8px;
             background: #161b22;
@@ -99,10 +101,10 @@
         .pos-green-mid  { background-color: #3fb950; color: #000; }    
         .pos-green-light{ background-color: #56d364; color: #000; }    
         
-        .pos-orange-light { background-color: #db6d28; color: #fff; } 
-        .pos-orange-std   { background-color: #bc4c00; color: #fff; } 
-        .pos-orange-strong{ background-color: #9e2a2b; color: #fff; } 
-        .pos-last         { background-color: #7f1d1d !important; color: #fff !important; font-weight: bold; } 
+        .pos-orange-light { background-color: #db6d28; color: #fff; }  
+        .pos-orange-std   { background-color: #bc4c00; color: #fff; }  
+        .pos-orange-strong{ background-color: #9e2a2b; color: #fff; }  
+        .pos-last         { background-color: #7f1d1d !important; color: #fff !important; font-weight: bold; }  
         .pos-none { background-color: #21262d; color: #8b949e; }     
 
         .rank-input {
@@ -157,7 +159,27 @@
             background-color: #2ea043;
         }
 
-        /* SECCIÓN NUEVA DE ESTADÍSTICAS */
+        /* SECCIÓN DE GRÁFICA NUEVA */
+        .chart-section {
+            margin-top: 40px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .chart-section h2 {
+            color: #00d2ff;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .chart-container {
+            position: relative;
+            height: 350px;
+            width: 100%;
+        }
+
+        /* SECCIÓN DE ESTADÍSTICAS */
         .stats-section {
             margin-top: 40px;
         }
@@ -256,7 +278,15 @@
         <button class="btn-update" onclick="guardarCambiosEnSupabase()">💾 ACTUALIZAR</button>
     </div>
 
-    <!-- SECCIÓN NUEVA DE ESTADÍSTICAS -->
+    <!-- SECCIÓN DE GRÁFICA INTERACTIVA -->
+    <div class="chart-section">
+        <h2>Comparativa Visual de Promedio de Posiciones por País</h2>
+        <div class="chart-container">
+            <canvas id="rankingChart"></canvas>
+        </div>
+    </div>
+
+    <!-- SECCIÓN DE ESTADÍSTICAS -->
     <div class="stats-section">
         <h2>Estadísticas por País</h2>
         <div id="stats-container" class="stats-grid">
@@ -268,23 +298,28 @@
         const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1';
         const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
 
-        // OBJETO PARA RASTREAR SOLO LOS CAMBIOS REALIZADOS
         window.cambiosPendientes = {};
         window.valoresOriginales = {};
+        let myChart = null;
 
-        // Mapeo básico de nombres de países a códigos ISO de 2 letras para banderas (FlagCDN)
+        // Mapeo corregido usando nombres oficiales en inglés para FlagCDN
         const countryCodes = {
-            "España": "es", "Albania": "al", "Alemania": "de", "Andorra": "ad", "Armenia": "am",
-            "Australia": "au", "Austria": "at", "Azerbaiyán": "az", "Bélgica": "be", "Bielorrusia": "by",
-            "Bosnia y Herzegovina": "ba", "Bulgaria": "bg", "Chipre": "cy", "Croacia": "hr", "Dinamarca": "dk",
-            "Eslovaquia": "sk", "Eslovenia": "si", "Estonia": "ee", "Finlandia": "fi", "Francia": "fr",
-            "Georgia": "ge", "Grecia": "gr", "Hungría": "hu", "Irlanda": "ie", "Islandia": "is",
-            "Israel": "il", "Italia": "it", "Letonia": "lv", "Lituania": "lt", "Macedonia del Norte": "mk",
-            "Malta": "mt", "Moldavia": "md", "Mónaco": "mc", "Montenegro": "me", "Noruega": "no",
-            "Países Bajos": "nl", "Polonia": "pl", "Portugal": "pt", "Reino Unido": "gb", "República Checa": "cz",
-            "Rumanía": "ro", "Rusia": "ru", "San Marino": "sm", "Serbia": "rs", "Suecia": "se",
-            "Suiza": "ch", "Turquía": "tr", "Ucrania": "ua", "Australia": "au", "Marruecos": "ma",
-            "Serbia y Montenegro": "cs", "Yugoslavia": "yu"
+            "Spain": "es", "Albania": "al", "Germany": "de", "Andorra": "ad", "Armenia": "am",
+            "Australia": "au", "Austria": "at", "Azerbaijan": "az", "Belgium": "be", "Belarus": "by",
+            "Bosnia and Herzegovina": "ba", "Bulgaria": "bg", "Cyprus": "cy", "Croatia": "hr", "Denmark": "dk",
+            "Slovakia": "sk", "Slovenia": "si", "Estonia": "ee", "Finland": "fi", "France": "fr",
+            "Georgia": "ge", "Greece": "gr", "Hungary": "hu", "Ireland": "ie", "Iceland": "is",
+            "Israel": "il", "Italy": "it", "Latvia": "lv", "Lithuania": "lt", "North Macedonia": "mk",
+            "Malta": "mt", "Moldova": "md", "Monaco": "mc", "Montenegro": "me", "Norway": "no",
+            "Netherlands": "nl", "Poland": "pl", "Portugal": "pt", "United Kingdom": "gb", "Czech Republic": "cz",
+            "Romania": "ro", "Russia": "ru", "San Marino": "sm", "Serbia": "rs", "Sweden": "se",
+            "Switzerland": "ch", "Turkey": "tr", "Ukraine": "ua", "Morocco": "ma",
+            "Serbia and Montenegro": "cs", "Yugoslavia": "yu",
+            // Compatibilidad por si acaso llegan en español en la BBDD:
+            "España": "es", "Alemania": "de", "Azerbaiyán": "az", "Bélgica": "be", "Bielorrusia": "by",
+            "Chipre": "cy", "Eslovaquia": "sk", "Eslovenia": "si", "Finlandia": "fi", "Francia": "fr",
+            "Grecia": "gr", "Hungría": "hu", "Letonia": "lv", "Noruega": "no", "Países Bajos": "nl",
+            "Reino Unido": "gb", "Rumanía": "ro", "Suecia": "se", "Suiza": "ch", "Turquía": "tr"
         };
 
         function obtenerUrlBandera(pais) {
@@ -380,6 +415,7 @@
             window.cambiosPendientes = {}; 
             renderizarCabecerasYTabla();
             renderizarEstadisticas();
+            actualizarGrafica();
         }
 
         function renderizarCabecerasYTabla() {
@@ -440,7 +476,6 @@
                 let tr = document.createElement('tr');
                 let tdPais = document.createElement('td');
                 
-                // Enlace al nombre del país requerido
                 let aPais = document.createElement('a');
                 aPais.href = `pais.html?nombre=${encodeURIComponent(pais)}`;
                 aPais.textContent = pais;
@@ -483,6 +518,7 @@
                                 registrarCambio(pais, ano, null);
                                 renderizarTablaCompleta();
                                 renderizarEstadisticas();
+                                actualizarGrafica();
                                 return;
                             }
 
@@ -542,6 +578,7 @@
 
                             renderizarTablaCompleta();
                             renderizarEstadisticas();
+                            actualizarGrafica();
                         });
 
                         td.appendChild(input);
@@ -555,7 +592,6 @@
             });
         }
 
-        // FUNCIÓN NUEVA PARA RENDERIZAR LAS ESTADÍSTICAS ABAJO
         function renderizarEstadisticas() {
             const { paises, anos, matriz, retiradas } = window.tablaData;
             const { maxRangoPorAnio } = calcularMaximosYParticipantes(paises, anos, matriz, retiradas);
@@ -612,6 +648,77 @@
                     </ul>
                 `;
                 statsContainer.appendChild(card);
+            });
+        }
+
+        // FUNCIÓN PARA GENERAR/ACTUALIZAR LA GRÁFICA CON CHART.JS
+        function actualizarGrafica() {
+            const { paises, anos, matriz, retiradas } = window.tablaData;
+            
+            // Calculamos la media de posición de cada país para pintar un gráfico de barras ordenado o top países
+            const datasetPaises = paises.map(pais => {
+                let suma = 0, count = 0;
+                anos.forEach(ano => {
+                    if (!(retiradas[pais] && retiradas[pais][ano] === true)) {
+                        let r = matriz[pais][ano];
+                        if (r !== undefined && r !== null && !isNaN(r)) {
+                            suma += r;
+                            count++;
+                        }
+                    }
+                });
+                return {
+                    pais: pais,
+                    media: count > 0 ? parseFloat((suma / count).toFixed(2)) : null
+                }
+            }).filter(item => item.media !== null);
+
+            // Ordenar por mejor media (menor número)
+            datasetPaises.sort((a, b) => a.media - b.media);
+
+            // Cogemos los primeros 15 países para que la gráfica no se sature, o todos si prefieres
+            const topData = datasetPaises.slice(0, 20);
+
+            const labels = topData.map(d => d.pais);
+            const dataValues = topData.map(d => d.media);
+
+            const ctx = document.getElementById('rankingChart').getContext('2d');
+            
+            if (myChart) {
+                myChart.destroy();
+            }
+
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Promedio de Posición (Menor es mejor)',
+                        data: dataValues,
+                        backgroundColor: '#00d2ff88',
+                        borderColor: '#00d2ff',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            reverse: true, // En Eurovisión / Festivales, posición 1 es arriba
+                            grid: { color: '#30363d' },
+                            ticks: { color: '#8b949e' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#c9d1d9' }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#c9d1d9' } }
+                    }
+                }
             });
         }
 
@@ -689,6 +796,7 @@
                 
                 renderizarCabecerasYTabla();
                 renderizarEstadisticas();
+                actualizarGrafica();
 
                 statusDiv.textContent = `✅ ¡${registrosParaGuardar.length} posiciones actualizadas con éxito (${hoy})!`;
                 statusDiv.style.color = '#3fb950';
