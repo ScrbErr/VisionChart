@@ -85,8 +85,25 @@
         .pos-orange-light { background-color: #db6d28; color: #fff; } /* 27 - 30 */
         .pos-orange-std   { background-color: #bc4c00; color: #fff; } /* 30+ */
         .pos-orange-strong{ background-color: #9e2a2b; color: #fff; } /* Últimos 5 */
+        .pos-last         { background-color: #654321 !important; color: #fff !important; font-weight: bold; } /* Último puesto (amarronado) */
         
         .pos-none { background-color: #21262d; color: #8b949e; }      /* No participa // */
+
+        /* Estilo para hacer las celdas editables */
+        .rank-input {
+            background: transparent;
+            border: none;
+            color: inherit;
+            font-weight: bold;
+            font-size: 13px;
+            text-align: center;
+            width: 40px;
+            outline: none;
+        }
+        .rank-input:focus {
+            background: rgba(0, 210, 255, 0.2);
+            border-radius: 4px;
+        }
 
         #status { text-align: center; font-weight: bold; margin-bottom: 15px; }
     </style>
@@ -96,7 +113,7 @@
     <a href="index.html" class="back-link">← Volver al Inicio</a>
 
     <h1>Matriz de Posiciones por Festival</h1>
-    <p class="subtitle">Evolución histórica de puestos obtenidos por año.</p>
+    <p class="subtitle">Evolución histórica de puestos obtenidos por año (editable).</p>
 
     <div id="status">Cargando datos de Supabase...</div>
 
@@ -121,7 +138,6 @@
             const statusDiv = document.getElementById('status');
             
             try {
-                // Descargamos en paralelo las tablas 'yearly_rankings' y 'festival'
                 const [resRankings, resFestival] = await Promise.all([
                     fetch(`${SUPABASE_URL}/yearly_rankings?select=country,year,rank`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
@@ -152,7 +168,6 @@
         let sortDirection = false; // false = asc, true = desc
 
         function construirMatriz(rankings, festival) {
-            // 1. Extraer listas únicas de países y años ordenados
             const paisesSet = new Set();
             const anosSet = new Set();
 
@@ -164,7 +179,6 @@
             const paises = Array.from(paisesSet).sort();
             const anos = Array.from(anosSet).sort((a, b) => a - b);
 
-            // 2. Mapear datos para acceso rápido: mapa[pais][año] = rank
             const matriz = {};
             paises.forEach(p => matriz[p] = {});
 
@@ -174,7 +188,6 @@
                 }
             });
 
-            // 3. Mapear retiradas: retiradas[pais][año] = true/false
             const retiradas = {};
             festival.forEach(f => {
                 if (f.country && f.year) {
@@ -183,7 +196,7 @@
                 }
             });
 
-            // 4. Calcular el número máximo de participantes (o peor rango) por año para los últimos 5
+            // Calcular el rango máximo (peor puesto real) y mínimo por año
             const maxRangoPorAnio = {};
             anos.forEach(ano => {
                 let maxR = 0;
@@ -194,14 +207,12 @@
                 maxRangoPorAnio[ano] = maxR;
             });
 
-            // 5. Pintar Cabeceras de Años
             const trHeaders = document.getElementById('table-headers');
             trHeaders.innerHTML = '<th onclick="ordenarColumna(0)">Países ↕</th>';
             anos.forEach((ano, index) => {
                 trHeaders.innerHTML += `<th onclick="ordenarColumna(${index + 1})">${ano} ↕</th>`;
             });
 
-            // Guardar datos globales para la ordenación
             window.tablaData = { paises, anos, matriz, retiradas, maxRangoPorAnio };
             renderizarCuerpo(paises, anos, matriz, retiradas, maxRangoPorAnio);
         }
@@ -226,7 +237,27 @@
                         td.textContent = '//';
                         td.className = 'pos-none';
                     } else {
-                        td.textContent = rank;
+                        // Creamos un input para permitir la edición local
+                        let input = document.createElement('input');
+                        input.type = 'text';
+                        input.value = rank;
+                        input.className = 'rank-input';
+                        
+                        // Actualizar en tiempo real el valor en la matriz local al escribir
+                        input.addEventListener('input', (e) => {
+                            let val = parseInt(e.target.value);
+                            matriz[pais][ano] = isNaN(val) ? null : val;
+                            // Recalcular el maxR por si acaso cambia drásticamente
+                            let maxRNew = 0;
+                            paises.forEach(p => {
+                                let r = matriz[p][ano];
+                                if (r && r > maxRNew) maxRNew = r;
+                            });
+                            maxRangoPorAnio[ano] = maxRNew;
+                            td.className = obtenerClasePosicion(val, maxRNew);
+                        });
+
+                        td.appendChild(input);
                         td.className = obtenerClasePosicion(rank, maxR);
                     }
                     tr.appendChild(td);
@@ -235,24 +266,24 @@
             });
         }
 
-        function obtenerClasePosicion(pos, totalParticipantesAnio) {
+        function obtenerClasePosicion(pos, maxRangoAnio) {
             if (pos === 1) return 'pos-1';
             if (pos === 2) return 'pos-2';
             if (pos === 3) return 'pos-3';
+            if (pos === maxRangoAnio && maxRangoAnio > 3) return 'pos-last'; // El último puesto exacto (amarronado)
             if (pos >= 4 && pos <= 5) return 'pos-green-dark';
             if (pos >= 6 && pos <= 10) return 'pos-green-mid';
             if (pos >= 11 && pos <= 26) return 'pos-green-light';
             if (pos >= 27 && pos <= 30) return 'pos-orange-light';
-            if (pos >= totalParticipantesAnio - 4) return 'pos-orange-strong';
+            if (pos >= maxRangoAnio - 4) return 'pos-orange-strong';
             return 'pos-orange-std';
         }
 
-        // Función de ordenación al hacer clic en las columnas
         function ordenarColumna(colIndex) {
             const { paises, anos, matriz, retiradas, maxRangoPorAnio } = window.tablaData;
             
             if (currentSortColumn === colIndex) {
-                sortDirection = !sortDirection; // Invertir orden
+                sortDirection = !sortDirection; 
             } else {
                 currentSortColumn = colIndex;
                 sortDirection = false;
@@ -261,12 +292,18 @@
             paises.sort((a, b) => {
                 let valA, valB;
                 if (colIndex === 0) {
-                    valA = a;
-                    valB = b;
+                    valA = a.toLowerCase();
+                    valB = b.toLowerCase();
                 } else {
                     let ano = anos[colIndex - 1];
-                    valA = matriz[a][ano] !== undefined ? matriz[a][ano] : 9999;
-                    valB = matriz[b][ano] !== undefined ? matriz[b][ano] : 9999;
+                    // Asignamos un valor muy alto (9999) a los que no tienen ranking o están retirados para que queden abajo
+                    let rA = matriz[a][ano];
+                    let isWitA = retiradas[a] && retiradas[a][ano] === true;
+                    valA = (!isWitA && rA !== undefined && rA !== null && !isNaN(rA)) ? rA : 9999;
+
+                    let rB = matriz[b][ano];
+                    let isWitB = retiradas[b] && retiradas[b][ano] === true;
+                    valB = (!isWitB && rB !== undefined && rB !== null && !isNaN(rB)) ? rB : 9999;
                 }
 
                 if (valA < valB) return sortDirection ? 1 : -1;
