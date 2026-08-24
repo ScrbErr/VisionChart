@@ -198,7 +198,7 @@
         <a href="index.html" class="back-link">← Volver al Inicio</a>
 
         <h1>Matriz de Posiciones por País</h1>
-        <p class="subtitle">Filas por año y columnas por país (Datos de <code>country_rankings</code>).</p>
+        <p class="subtitle">Filas por año y columnas por país (Controlado por <code>festival.withdrawn</code> y <code>country_rankings</code>).</p>
 
         <div id="status">Cargando datos de Supabase...</div>
 
@@ -263,20 +263,23 @@
             const matriz = {}; 
             const retiradosMap = {}; 
 
-            rankings.forEach(item => {
-                if (item.country) paisesSet.add(item.country);
-                if (item.year) anosSet.add(item.year);
-            });
-
+            // 1. Procesar la tabla FESTIVAL para detectar withdrawn de forma estricta (booleano true)
             festival.forEach(f => {
                 if (f.country && f.year) {
                     paisesSet.add(f.country);
                     anosSet.add(f.year);
                     if (!retiradosMap[f.year]) retiradosMap[f.year] = {};
-                    if (f.withdrawn === true || f.withdrawn === 'true' || f.withdrawn === '1') {
+                    
+                    // Comprobación estricta del booleano true en withdrawn
+                    if (f.withdrawn === true || f.withdrawn === 'true') {
                         retiradosMap[f.year][f.country] = true;
                     }
                 }
+            });
+
+            rankings.forEach(item => {
+                if (item.country) paisesSet.add(item.country);
+                if (item.year) anosSet.add(item.year);
             });
 
             const paises = Array.from(paisesSet).sort();
@@ -284,22 +287,22 @@
 
             anos.forEach(ano => matriz[ano] = {});
 
-            // Rellenar con retirados obligatorios primero
+            // 2. Rellenar matriz aplicando '//' si el festival marca withdrawn = true
             anos.forEach(ano => {
                 paises.forEach(pais => {
-                    if (retiradosMap[ano] && retiradosMap[ano][pais]) {
+                    let key = `${ano}|${pais}`;
+                    if (retiradosMap[ano] && retiradosMap[ano][pais] === true) {
                         matriz[ano][pais] = '//';
-                        window.valoresOriginales[`${ano}|${pais}`] = '//';
+                        window.valoresOriginales[key] = '//';
                     }
                 });
             });
 
-            // Rellenar con los rankings de Supabase
+            // 3. Rellenar con los rankings de Supabase siempre que no esté retirado
             rankings.forEach(item => {
                 if (item.country && item.year) {
                     let key = `${item.year}|${item.country}`;
-                    // Si ya está marcado como retirado por el festival, respetamos '//'
-                    if (retiradosMap[item.year] && retiradosMap[item.year][item.country]) {
+                    if (retiradosMap[item.year] && retiradosMap[item.year][item.country] === true) {
                         matriz[item.year][item.country] = '//';
                         window.valoresOriginales[key] = '//';
                     } else {
@@ -355,7 +358,7 @@
 
                 paises.forEach(pais => {
                     let td = document.createElement('td');
-                    let isWithdrawn = retiradosMap[ano] && retiradosMap[ano][pais];
+                    let isWithdrawn = retiradosMap[ano] && retiradosMap[ano][pais] === true;
                     let val = matriz[ano] && matriz[ano][pais] !== undefined ? matriz[ano][pais] : '';
                     
                     if (isWithdrawn) {
@@ -366,9 +369,7 @@
                     td.className = obtenerClasePosicion(val);
 
                     let input = document.createElement('input');
-                    input.type = 'number';
-                    input.min = '1';
-                    input.max = '999'; // Límite amplio y seguro para que no limite de forma artificial a 6
+                    input.type = 'text'; // Usamos text pero validamos estrictamente en el evento para evitar letras
                     input.className = 'rank-input';
                     input.value = (val === '//') ? '//' : val;
                     input.dataset.year = ano;
@@ -377,6 +378,11 @@
                     if (isWithdrawn) {
                         input.disabled = true;
                     }
+
+                    input.addEventListener('input', (e) => {
+                        // Limpiar caracteres que no sean números instantáneamente
+                        e.target.value = e.target.value.replace(/[^0-9]/g, '');
+                    });
 
                     input.addEventListener('change', (e) => {
                         handleInputChange(e, ano);
@@ -400,7 +406,10 @@
             let c = input.dataset.country;
             let valStr = input.value.trim();
 
-            if (valStr === '' || valStr === '//') {
+            let matrizAno = window.tablaData.matriz[y];
+            if (!matrizAno) matrizAno = window.tablaData.matriz[y] = {};
+
+            if (valStr === '') {
                 matrizAno[c] = null;
                 registrarCambio(y, c, '');
                 renderizarTablaCompleta();
@@ -409,12 +418,11 @@
             }
 
             let nuevoVal = parseInt(valStr);
-            if (isNaN(nuevoVal) || nuevoVal < 1) {
+            if (isNaN(nuevoVal) || nuevoVal < 1 || nuevoVal > 99) { // Restringir posiciones lógicas entre 1 y 99
                 input.value = window.valoresOriginales[`${y}|${c}`] || '';
                 return;
             }
 
-            let matrizAno = window.tablaData.matriz[y];
             matrizAno[c] = nuevoVal;
             registrarCambio(y, c, nuevoVal);
 
