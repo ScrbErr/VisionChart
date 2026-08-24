@@ -3,8 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>Posiciones por Festival - VisionChart</title>
-    <!-- Incluimos Chart.js desde CDN para las gráficas -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -159,26 +157,6 @@
             background-color: #2ea043;
         }
 
-        /* SECCIÓN DE GRÁFICA NUEVA */
-        .chart-section {
-            margin-top: 40px;
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
-        .chart-section h2 {
-            color: #00d2ff;
-            text-align: center;
-            margin-bottom: 15px;
-        }
-        .chart-container {
-            position: relative;
-            height: 350px;
-            width: 100%;
-        }
-
         /* SECCIÓN DE ESTADÍSTICAS */
         .stats-section {
             margin-top: 40px;
@@ -292,7 +270,6 @@
 
         window.cambiosPendientes = {};
         window.valoresOriginales = {};
-        let myChart = null;
 
         // Mapeo corregido usando nombres oficiales en inglés para FlagCDN
         const countryCodes = {
@@ -402,7 +379,6 @@
             window.cambiosPendientes = {}; 
             renderizarCabecerasYTabla();
             renderizarEstadisticas();
-            actualizarGrafica();
         }
 
         function renderizarCabecerasYTabla() {
@@ -505,7 +481,6 @@
                                 registrarCambio(pais, ano, null);
                                 renderizarTablaCompleta();
                                 renderizarEstadisticas();
-                                actualizarGrafica();
                                 return;
                             }
 
@@ -565,7 +540,6 @@
 
                             renderizarTablaCompleta();
                             renderizarEstadisticas();
-                            actualizarGrafica();
                         });
 
                         td.appendChild(input);
@@ -576,6 +550,65 @@
                     tr.appendChild(td);
                 });
                 tbody.appendChild(tr);
+            });
+        }
+
+        function renderizarEstadisticas() {
+            const { paises, anos, matriz, retiradas } = window.tablaData;
+            const { maxRangoPorAnio } = calcularMaximosYParticipantes(paises, anos, matriz, retiradas);
+            const statsContainer = document.getElementById('stats-container');
+            statsContainer.innerHTML = '';
+
+            paises.forEach(pais => {
+                let top1 = 0, top2 = 0, top3 = 0, top5 = 0, top10 = 0, top26 = 0, fuera27Plus = 0, bottom5 = 0;
+                let sumaRanks = 0;
+                let totalParticipaciones = 0;
+
+                anos.forEach(ano => {
+                    let isWithdrawn = retiradas[pais] && retiradas[pais][ano] === true;
+                    if (isWithdrawn) return;
+
+                    let rank = matriz[pais][ano];
+                    if (rank !== undefined && rank !== null && !isNaN(rank)) {
+                        totalParticipaciones++;
+                        sumaRanks += rank;
+
+                        if (rank === 1) top1++;
+                        if (rank <= 2) top2++;
+                        if (rank <= 3) top3++;
+                        if (rank <= 5) top5++;
+                        if (rank <= 10) top10++;
+                        if (rank <= 26) top26++;
+
+                        let maxR = maxRangoPorAnio[ano] || 25;
+                        if (rank >= 27) fuera27Plus++;
+                        if (rank >= maxR - 4 && maxR >= 5) bottom5++;
+                    }
+                });
+
+                let media = totalParticipaciones > 0 ? (sumaRanks / totalParticipaciones).toFixed(2) : '-';
+                let flagUrl = obtenerUrlBandera(pais);
+
+                let card = document.createElement('div');
+                card.className = 'country-stat-card';
+                card.innerHTML = `
+                    <div class="card-header">
+                        <img src="${flagUrl}" alt="Bandera ${pais}" onerror="this.src='https://flagcdn.com/w40/un.png'">
+                        <a href="pais.html?nombre=${encodeURIComponent(pais)}">${pais}</a>
+                    </div>
+                    <ul class="stats-list">
+                        <li><span class="label">Top 1:</span> <span class="value">${top1}</span></li>
+                        <li><span class="label">Top 2:</span> <span class="value">${top2}</span></li>
+                        <li><span class="label">Top 3:</span> <span class="value">${top3}</span></li>
+                        <li><span class="label">Top 5:</span> <span class="value">${top5}</span></li>
+                        <li><span class="label">Top 10:</span> <span class="value">${top10}</span></li>
+                        <li><span class="label">Top 26:</span> <span class="value">${top26}</span></li>
+                        <li><span class="label">Fuera (27-última):</span> <span class="value">${fuera27Plus}</span></li>
+                        <li><span class="label">Bottom 5:</span> <span class="value">${bottom5}</span></li>
+                        <li><span class="label">Media de posición:</span> <span class="value highlight-avg">${media}</span></li>
+                    </ul>
+                `;
+                statsContainer.appendChild(card);
             });
         }
 
@@ -653,7 +686,6 @@
                 
                 renderizarCabecerasYTabla();
                 renderizarEstadisticas();
-                actualizarGrafica();
 
                 statusDiv.textContent = `✅ ¡${registrosParaGuardar.length} posiciones actualizadas con éxito (${hoy})!`;
                 statusDiv.style.color = '#3fb950';
