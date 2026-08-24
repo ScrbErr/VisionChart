@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>VisiónChart - Matriz por País (Años x Países)</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f6f9; color: #333; }
+        h1 { text-align: center; color: #2c3e50; }
+        
+        /* Controles superiores */
+        .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: #fff; padding: 10px 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .btn { padding: 8px 15px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 14px; }
+        .btn-save { background-color: #27ae60; color: white; transition: all 0.3s ease; }
+        .btn-undo { background-color: #e74c3c; color: white; display: none; }
+        .btn-export { background-color: #2980b9; color: white; }
+
+        /* Animación de pulso para cambios pendientes */
+        @keyframes pulse-warning {
+            0% { background-color: #f39c12; transform: scale(1); }
+            50% { background-color: #f1c40f; transform: scale(1.05); }
+            100% { background-color: #f39c12; transform: scale(1); }
+        }
+        .pulse-active { animation: pulse-warning 1s infinite; }
+
+        /* Contenedor de la tabla */
+        .table-container { max-height: 70vh; overflow: auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 6px; }
+        
+        /* Cabeceras fijas */
+        th { background-color: #2c3e50; color: white; position: sticky; top: 0; z-index: 10; }
+        .year-col { position: sticky; left: 0; background-color: #34495e; color: white; z-index: 5; font-weight: bold; }
+
+        /* Celdas e Inputs */
+        input.rank-input { width: 45px; text-align: center; border: 1px solid #ccc; padding: 4px; border-radius: 3px; font-size: 13px; }
+        .cell-modified { background-color: #fef5e7 !important; border: 2px dashed #f39c12 !important; }
+        
+        /* Estilo para retiradas (//) o sin datos (-) */
+        .withdrawn { background-color: #e5e8e8; color: #7f8c8d; font-style: italic; }
+    </style>
+</head>
+<body>
+
+    <h1>VisiónChart - Matriz Histórica (Años vs Países)</h1>
+
+    <div class="controls">
+        <div>
+            <span id="pending-counter" style="font-weight: bold; margin-right: 15px;">Cambios pendientes: 0</span>
+            <button id="btn-undo" class="btn btn-undo" onclick="undoChanges()">↩ DESHACER</button>
+        </div>
+        <div>
+            <button id="btn-export" class="btn btn-export" onclick="exportCSV()">📥 EXPORTAR CSV</button>
+            <button id="btn-save" class="btn btn-save" onclick="saveChanges()">💾 ACTUALIZAR</button>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table id="matrix-table">
+            <thead>
+                <tr id="table-headers">
+                    <th>Año</th>
+                    <!-- Dinámico: Países -->
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <!-- Dinámico: Filas de años -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Configuración Supabase y variables globales de estado
+        const SUPABASE_URL = "TU_SUPABASE_URL";
+        const SUPABASE_KEY = "TU_SUPABASE_ANON_KEY";
+
+        let originalData = {}; // Guarda el estado original cargado de la BD: { "2024-Spain": "6", ... }
+        let currentData = {};  // Estado actual con modificaciones del usuario: { "2024-Spain": "5", ... }
+        let countriesList = [];
+        let yearsList = [];
+
+        // Diccionario de códigos ISO para FlagCDN (ejemplo)
+        const countryCodes = {
+            "Albania": "al", "Armenia": "am", "Australia": "au", "Austria": "at", 
+            "Azerbaijan": "az", "Belarus": "by", "Belgium": "be", "Bulgaria": "bg"
+        };
+
+        async function loadMatrixData() {
+            try {
+                // Petición a Supabase (ajustar nombre de tabla según tu esquema)
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/yearly_rankings?select=*`, {
+                    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
+                });
+                const rows = await response.json();
+
+                processRows(rows);
+                renderTable();
+            } catch (error) {
+                console.error("Error al cargar los datos:", error);
+            }
+        }
+
+        function processRows(rows) {
+            // Extraer listas únicas de años y países ordenados
+            const yearsSet = new Set();
+            const countriesSet = new Set();
+
+            rows.forEach(row => {
+                yearsSet.add(row.year);
+                countriesSet.add(row.country);
+                const key = `${row.year}-${row.country}`;
+                originalData[key] = row.position;
+                currentData[key] = row.position;
+            });
+
+            yearsList = Array.from(yearsSet).sort((a, b) => b - a); // Años descendentes como en tu imagen
+            countriesList = Array.from(countriesSet).sort();
+        }
+
+        function renderTable() {
+            const headerRow = document.getElementById("table-headers");
+            const tBody = document.getElementById("table-body");
+
+            // 1. Renderizar Cabeceras (Países con banderas)
+            let headerHTML = "<th>Año</th>";
+            countriesList.forEach(country => {
+                const code = countryCodes[country] ? `<img src="https://flagcdn.com/24x18/${countryCodes[country]}.png" style="vertical-align:middle; margin-right:4px;">` : "";
+                headerHTML += `<th>${code}${country}</th>`;
+            });
+            headerRow.innerHTML = headerHTML;
+
+            // 2. Renderizar Filas (Años)
+            let bodyHTML = "";
+            yearsList.forEach(year => {
+                bodyHTML += `<tr><td class="year-col">${year}</td>`;
+                countriesList.forEach(country => {
+                    const key = `${year}-${country}`;
+                    const val = currentData[key] !== undefined ? currentData[key] : "-";
+                    const isModified = currentData[key] !== originalData[key];
+                    const modifiedClass = isModified ? "cell-modified" : "";
+                    const isWithdrawn = val === "//" ? "withdrawn" : "";
+
+                    bodyHTML += `<td>
+                        <input type="text" class="rank-input ${modifiedClass} ${isWithdrawn}" 
+                            value="${val}" 
+                            data-year="${year}" 
+                            data-country="${country}" 
+                            oninput="handleCellChange(this)">
+                    </td>`;
+                });
+                bodyHTML += `</tr>`;
+            });
+            tBody.innerHTML = bodyHTML;
+            updateUIState();
+        }
+
+        function handleCellChange(input) {
+            const year = input.dataset.year;
+            const country = input.dataset.country;
+            const key = `${year}-${country}`;
+            
+            currentData[key] = input.value.trim();
+            
+            // Actualizar estilo visual de la celda individualmente
+            if (currentData[key] !== originalData[key]) {
+                input.classList.add("cell-modified");
+            } else {
+                input.classList.remove("cell-modified");
+            }
+            updateUIState();
+        }
+
+        function countPendingChanges() {
+            let count = 0;
+            for (let key in currentData) {
+                if (currentData[key] !== originalData[key]) count++;
+            }
+            return count;
+        }
+
+        function updateUIState() {
+            const pending = countPendingChanges();
+            document.getElementById("pending-counter").innerText = `Cambios pendientes: ${pending}`;
+            
+            const saveBtn = document.getElementById("btn-save");
+            const undoBtn = document.getElementById("btn-undo");
+
+            if (pending > 0) {
+                saveBtn.classList.add("pulse-active");
+                undoBtn.style.display = "inline-block";
+            } else {
+                saveBtn.classList.remove("pulse-active");
+                undoBtn.style.display = "none";
+            }
+        }
+
+        function undoChanges() {
+            currentData = { ...originalData };
+            renderTable();
+        }
+
+        async function saveChanges() {
+            // Preparar payloads de actualización para Supabase (Upsert masivo o por lotes)
+            let upserts = [];
+            for (let key in currentData) {
+                if (currentData[key] !== originalData[key]) {
+                    const [year, country] = key.split("-");
+                    upserts.push({ year: parseInt(year), country: country, position: currentData[key] });
+                }
+            }
+
+            if (upserts.length === 0) return;
+
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/yearly_rankings`, {
+                    method: "POST",
+                    headers: {
+                        "apikey": SUPABASE_KEY,
+                        "Authorization": `Bearer ${SUPABASE_KEY}`,
+                        "Content-Type": "application/json",
+                        "Prefer": "resolution=merge-duplicates"
+                    },
+                    body: JSON.stringify(upserts)
+                });
+
+                if (response.ok) {
+                    originalData = { ...currentData };
+                    renderTable();
+                    alert("¡Cambios guardados correctamente en Supabase!");
+                } else {
+                    alert("Hubo un error al guardar los cambios.");
+                }
+            } catch (err) {
+                console.error("Error en el guardado:", err);
+            }
+        }
+
+        function exportCSV() {
+            let csv = "Año," + countriesList.join(",") + "\n";
+            yearsList.forEach(year => {
+                let row = [year];
+                countriesList.forEach(country => {
+                    row.push(currentData[`${year}-${country}`] || "-");
+                });
+                csv += row.join(",") + "\n";
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "visionchart_por_pais.csv";
+            link.click();
+        }
+
+        // Inicializar carga al abrir la página
+        loadMatrixData();
+    </script>
+</body>
+</html>
