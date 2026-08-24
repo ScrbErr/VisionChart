@@ -4,12 +4,83 @@
     <meta charset="UTF-8">
     <title>VisionChart - Eurovisión</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 80px auto; padding: 0 20px; background: #f4f4f9; color: #333; text-align: center; }
-        h1 { color: #ff2a85; font-size: 2.5em; margin-bottom: 10px; }
-        .card { background: white; padding: 40px 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
-        p { color: #666; font-size: 1.1em; margin-bottom: 30px; }
-        .btn { display: inline-block; background: #ff2a85; color: white; padding: 12px 25px; font-size: 16px; font-weight: bold; text-decoration: none; border-radius: 6px; transition: background 0.2s; }
-        .btn:hover { background: #d91b6c; }
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 900px; 
+            margin: 40px auto; 
+            padding: 0 20px; 
+            background: #0d1117; 
+            color: #c9d1d9; 
+            text-align: center; 
+        }
+        h1 { color: #00d2ff; font-size: 2.5em; margin-bottom: 10px; }
+        h2 { color: #00d2ff; font-size: 1.5em; margin-top: 30px; }
+        .card { 
+            background: #161b22; 
+            padding: 40px 20px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.6); 
+            border: 1px solid #30363d;
+            margin-bottom: 30px;
+        }
+        p { color: #8b949e; font-size: 1.1em; margin-bottom: 25px; }
+        
+        .menu-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .btn { 
+            display: inline-block; 
+            background: #238636; 
+            color: white; 
+            padding: 12px 25px; 
+            font-size: 15px; 
+            font-weight: bold; 
+            text-decoration: none; 
+            border-radius: 6px; 
+            transition: background 0.2s; 
+            border: 1px solid rgba(27,31,35,0.15);
+        }
+        .btn:hover { background: #2ea043; }
+        .btn-secondary {
+            background: #21262d;
+            color: #00d2ff;
+            border: 1px solid #30363d;
+        }
+        .btn-secondary:hover {
+            background: #30363d;
+            color: #39h;
+        }
+
+        /* Cuadrícula de países inferior */
+        .countries-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+            text-align: left;
+        }
+        .country-card {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            padding: 10px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            color: #c9d1d9;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .country-card:hover {
+            border-color: #00d2ff;
+            background: #1f242c;
+            color: #00d2ff;
+        }
     </style>
 </head>
 <body>
@@ -17,7 +88,29 @@
     <div class="card">
         <h1>VisionChart 🎵</h1>
         <p>Tu gestor histórico definitivo de Eurovisión.</p>
-        <a href="festival.html" class="btn">Ver Participantes 2026</a>
+        
+        <!-- Botones principales de navegación -->
+        <div class="menu-buttons">
+            <a href="festival.html" class="btn">Participantes 2026</a>
+            <a href="historico.html" class="btn btn-secondary">Matriz Histórica (Yearly)</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Países 🌍</h2>
+        <p>Selecciona un país para ver su perfil y evolución individual detallada:</p>
+        
+        <!-- Ejemplo estático o dinámico de accesos directos por país -->
+        <div class="countries-grid">
+            <a href="pais.html?nombre=Spain" class="country-card">🇪🇸 España</a>
+            <a href="pais.html?nombre=Sweden" class="country-card">🇸🇪 Suecia</a>
+            <a href="pais.html?nombre=Italy" class="country-card">🇮🇹 Italia</a>
+            <a href="pais.html?nombre=France" class="country-card">🇫🇷 Francia</a>
+            <a href="pais.html?nombre=United%20Kingdom" class="country-card">🇬🇧 Reino Unido</a>
+            <a href="pais.html?nombre=Bosnia%20and%20Herzegovina" class="country-card">🇧🇦 Bosnia & Herz.</a>
+            <a href="pais.html?nombre=Germany" class="country-card">🇩🇪 Alemania</a>
+            <a href="pais.html?nombre=Ukraine" class="country-card">🇺🇦 Ucrania</a>
+        </div>
     </div>
 
 </body>
