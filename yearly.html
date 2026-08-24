@@ -180,6 +180,13 @@
         const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1';
         const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
 
+        // OBJETO PARA RASTREAR SOLO LOS CAMBIOS REALIZADOS
+        window.cambiosPendientes = {};
+
+        function registrarCambio(pais, ano, valor) {
+            window.cambiosPendientes[`${pais}|${ano}`] = valor;
+        }
+
         async function cargarDatos() {
             const statusDiv = document.getElementById('status');
             
@@ -255,6 +262,8 @@
             });
 
             window.tablaData = { paises, anos, matriz, retiradas, fechasPorAnio };
+            // Reiniciamos los cambios pendientes al construir de nuevo
+            window.cambiosPendientes = {}; 
             renderizarCabecerasYTabla();
         }
 
@@ -336,9 +345,11 @@
 
                         input.addEventListener('change', (e) => {
                             let rawVal = e.target.value.replace(/[^0-9]/g, '');
+                            let huboMultiplesCambios = false;
                             
                             if (rawVal === '') {
                                 matriz[pais][ano] = null;
+                                registrarCambio(pais, ano, null);
                                 e.target.value = '';
                             } else {
                                 let val = parseInt(rawVal);
@@ -353,6 +364,8 @@
                                             let pRank = matriz[p][ano];
                                             if (pRank !== undefined && pRank !== null && !isNaN(pRank) && pRank >= val) {
                                                 matriz[p][ano] = pRank + 1;
+                                                registrarCambio(p, ano, matriz[p][ano]); // Marcamos el afectado
+                                                huboMultiplesCambios = true;
                                             }
                                         }
                                     });
@@ -363,6 +376,8 @@
                                             if (pRank !== undefined && pRank !== null && !isNaN(pRank)) {
                                                 if (pRank > oldVal && pRank <= val) {
                                                     matriz[p][ano] = pRank - 1;
+                                                    registrarCambio(p, ano, matriz[p][ano]); // Marcamos el afectado
+                                                    huboMultiplesCambios = true;
                                                 }
                                             }
                                         }
@@ -374,6 +389,8 @@
                                             if (pRank !== undefined && pRank !== null && !isNaN(pRank)) {
                                                 if (pRank >= val && pRank < oldVal) {
                                                     matriz[p][ano] = pRank + 1;
+                                                    registrarCambio(p, ano, matriz[p][ano]); // Marcamos el afectado
+                                                    huboMultiplesCambios = true;
                                                 }
                                             }
                                         }
@@ -381,12 +398,18 @@
                                 }
 
                                 matriz[pais][ano] = val;
+                                registrarCambio(pais, ano, val); // Marcamos el modificado directamente
                                 e.target.value = val;
                             }
 
-                            td.className = (matriz[pais][ano] !== undefined && matriz[pais][ano] !== null && !isNaN(matriz[pais][ano])) 
-                                ? obtenerClasePosicion(matriz[pais][ano], maxR) 
-                                : 'pos-none';
+                            // Si otras posiciones se vieron afectadas, repintamos toda la tabla para refrescar la UI
+                            if (huboMultiplesCambios) {
+                                renderizarTablaCompleta();
+                            } else {
+                                td.className = (matriz[pais][ano] !== undefined && matriz[pais][ano] !== null && !isNaN(matriz[pais][ano])) 
+                                    ? obtenerClasePosicion(matriz[pais][ano], maxR) 
+                                    : 'pos-none';
+                            }
                         });
 
                         td.appendChild(input);
@@ -401,39 +424,54 @@
         }
 
         async function guardarCambiosEnSupabase() {
-            const { paises, anos, matriz } = window.tablaData;
             const statusDiv = document.getElementById('status');
+            
+            // Verificamos si hay cambios realmente pendientes
+            if (!window.cambiosPendientes || Object.keys(window.cambiosPendientes).length === 0) {
+                statusDiv.textContent = "ℹ️ No hay posiciones nuevas o modificadas para guardar.";
+                statusDiv.style.color = '#e08a1e';
+                return;
+            }
 
+            const { paises, anos } = window.tablaData;
             const hoy = new Date().toISOString().split('T')[0];
 
             let registrosParaGuardar = [];
-            
-            // Ordenamos los países alfabéticamente para calcular su índice exacto (1-based index)
             const paisesOrdenados = [...paises].sort();
+            let anosAfectados = new Set();
 
-            paises.forEach(p => {
-                anos.forEach(ano => {
-                    let r = matriz[p][ano];
-                    if (r !== undefined && r !== null && !isNaN(r)) {
-                        // Generación del ID personalizado: 3 últimos dígitos del año + posición alfabética del país (con 2 dígitos ej: 04)
-                        const anioStr = String(ano);
-                        const ultimosTresAnio = anioStr.slice(-3);
-                        const indexPais = paisesOrdenados.indexOf(p) + 1;
-                        const posPaisStr = String(indexPais).padStart(2, '0');
-                        const customId = ultimosTresAnio + posPaisStr; // Ej: Australia 2016 -> 01604
+            // Iteramos EXCLUSIVAMENTE sobre las celdas que fueron modificadas
+            for (const key in window.cambiosPendientes) {
+                const [p, anoStr] = key.split('|');
+                const ano = parseInt(anoStr);
+                const r = window.cambiosPendientes[key];
 
-                        registrosParaGuardar.push({ 
-                            id: customId,
-                            country: p, 
-                            year: ano, 
-                            rank: r, 
-                            date: hoy 
-                        });
-                    }
-                });
-            });
+                if (r !== undefined && r !== null && !isNaN(r)) {
+                    // Generamos ID
+                    const ultimosTresAnio = anoStr.slice(-3);
+                    const indexPais = paisesOrdenados.indexOf(p) + 1;
+                    const posPaisStr = String(indexPais).padStart(2, '0');
+                    const customId = ultimosTresAnio + posPaisStr; 
 
-            statusDiv.textContent = "💾 Guardando cambios en Supabase...";
+                    registrosParaGuardar.push({ 
+                        id: customId,
+                        country: p, 
+                        year: ano, 
+                        rank: r, 
+                        date: hoy 
+                    });
+                    anosAfectados.add(ano);
+                }
+            }
+
+            if (registrosParaGuardar.length === 0) {
+                statusDiv.textContent = "ℹ️ No hay posiciones válidas para guardar.";
+                statusDiv.style.color = '#e08a1e';
+                window.cambiosPendientes = {};
+                return;
+            }
+
+            statusDiv.textContent = `💾 Guardando ${registrosParaGuardar.length} cambios en Supabase...`;
             statusDiv.style.color = '#00d2ff';
 
             try {
@@ -450,13 +488,16 @@
 
                 if (!response.ok) throw new Error('Error al guardar en la base de datos.');
 
-                anos.forEach(ano => {
+                anosAfectados.forEach(ano => {
                     window.tablaData.fechasPorAnio[ano] = hoy;
                 });
                 
+                // Limpiamos los cambios porque ya se han guardado con éxito
+                window.cambiosPendientes = {};
+                
                 renderizarCabecerasYTabla();
 
-                statusDiv.textContent = `✅ ¡Cambios actualizados y guardados con éxito (${hoy})!`;
+                statusDiv.textContent = `✅ ¡${registrosParaGuardar.length} posiciones actualizadas con éxito (${hoy})!`;
                 statusDiv.style.color = '#3fb950';
 
             } catch (error) {
