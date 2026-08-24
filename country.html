@@ -270,6 +270,8 @@
 
             festival.forEach(f => {
                 if (f.country && f.year) {
+                    paisesSet.add(f.country);
+                    anosSet.add(f.year);
                     if (!retiradosMap[f.year]) retiradosMap[f.year] = {};
                     if (f.withdrawn === true || f.withdrawn === 'true' || f.withdrawn === '1') {
                         retiradosMap[f.year][f.country] = true;
@@ -282,14 +284,29 @@
 
             anos.forEach(ano => matriz[ano] = {});
 
+            // Rellenar con retirados obligatorios primero
+            anos.forEach(ano => {
+                paises.forEach(pais => {
+                    if (retiradosMap[ano] && retiradosMap[ano][pais]) {
+                        matriz[ano][pais] = '//';
+                        window.valoresOriginales[`${ano}|${pais}`] = '//';
+                    }
+                });
+            });
+
+            // Rellenar con los rankings de Supabase
             rankings.forEach(item => {
                 if (item.country && item.year) {
-                    let val = item.position;
+                    let key = `${item.year}|${item.country}`;
+                    // Si ya está marcado como retirado por el festival, respetamos '//'
                     if (retiradosMap[item.year] && retiradosMap[item.year][item.country]) {
-                        val = '//';
+                        matriz[item.year][item.country] = '//';
+                        window.valoresOriginales[key] = '//';
+                    } else {
+                        let val = item.position;
+                        matriz[item.year][item.country] = val;
+                        window.valoresOriginales[key] = val;
                     }
-                    matriz[item.year][item.country] = val;
-                    window.valoresOriginales[`${item.year}|${item.country}`] = val;
                 }
             });
 
@@ -336,17 +353,6 @@
                 tdAno.textContent = ano;
                 tr.appendChild(tdAno);
 
-                // Contar cuántos países tienen una posición numérica válida en este año
-                let activosEnAno = 0;
-                paises.forEach(p => {
-                    let v = matriz[ano] && matriz[ano][p];
-                    let isW = retiradosMap[ano] && retiradosMap[ano][p];
-                    if (v !== undefined && v !== '' && v !== null && !isW && v !== '//' && !isNaN(parseInt(v))) {
-                        activosEnAno++;
-                    }
-                });
-                if (activosEnAno < 1) activosEnAno = paises.length;
-
                 paises.forEach(pais => {
                     let td = document.createElement('td');
                     let isWithdrawn = retiradosMap[ano] && retiradosMap[ano][pais];
@@ -362,7 +368,7 @@
                     let input = document.createElement('input');
                     input.type = 'number';
                     input.min = '1';
-                    input.max = activosEnAno;
+                    input.max = '999'; // Límite amplio y seguro para que no limite de forma artificial a 6
                     input.className = 'rank-input';
                     input.value = (val === '//') ? '//' : val;
                     input.dataset.year = ano;
@@ -373,7 +379,7 @@
                     }
 
                     input.addEventListener('change', (e) => {
-                        handleInputChange(e, activosEnAno, ano);
+                        handleInputChange(e, ano);
                     });
 
                     let key = `${ano}|${pais}`;
@@ -388,22 +394,27 @@
             });
         }
 
-        function handleInputChange(e, maxVal, ano) {
+        function handleInputChange(e, ano) {
             let input = e.target;
             let y = ano;
             let c = input.dataset.country;
-            let nuevoVal = parseInt(input.value);
+            let valStr = input.value.trim();
 
+            if (valStr === '' || valStr === '//') {
+                matrizAno[c] = null;
+                registrarCambio(y, c, '');
+                renderizarTablaCompleta();
+                actualizarEstadoBotonGuardar();
+                return;
+            }
+
+            let nuevoVal = parseInt(valStr);
             if (isNaN(nuevoVal) || nuevoVal < 1) {
                 input.value = window.valoresOriginales[`${y}|${c}`] || '';
                 return;
             }
-            if (nuevoVal > maxVal) nuevoVal = maxVal;
 
             let matrizAno = window.tablaData.matriz[y];
-
-            // Asignación directa y limpia: Solo cambiamos el país seleccionado. 
-            // Si quieres que intercambien posición si otro ya la tiene, puedes gestionarlo aquí o dejarlo fijo.
             matrizAno[c] = nuevoVal;
             registrarCambio(y, c, nuevoVal);
 
