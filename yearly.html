@@ -187,7 +187,6 @@
 
         function registrarCambio(pais, ano, valor) {
             const key = `${pais}|${ano}`;
-            // Si el valor actual coincide con el original, lo quitamos de pendientes
             if (window.valoresOriginales[key] === valor) {
                 delete window.cambiosPendientes[key];
             } else {
@@ -279,11 +278,24 @@
             const { anos, fechasPorAnio } = window.tablaData;
             
             const trHeaders = document.getElementById('table-headers');
-            trHeaders.innerHTML = '<th onclick="ordenarColumna(0)">Países ↕</th>';
+            trHeaders.innerHTML = '';
             
+            // Renderizar cabecera de Países con su indicador de orden
+            let arrowPais = '↕';
+            if (currentSortColumn === 0) {
+                arrowPais = sortDirection ? '↓' : '↑';
+            }
+            trHeaders.innerHTML += `<th onclick="ordenarColumna(0)">Países <span id="sort-arrow-0">${arrowPais}</span></th>`;
+            
+            // Renderizar cabeceras de Años con sus indicadores de orden
             anos.forEach((ano, index) => {
+                let colIdx = index + 1;
+                let arrowAno = '↕';
+                if (currentSortColumn === colIdx) {
+                    arrowAno = sortDirection ? '↓' : '↑';
+                }
                 let fechaStr = fechasPorAnio[ano] ? `<span class="th-date">${fechasPorAnio[ano]}</span>` : '';
-                trHeaders.innerHTML += `<th onclick="ordenarColumna(${index + 1})">${ano} ↕${fechaStr}</th>`;
+                trHeaders.innerHTML += `<th onclick="ordenarColumna(${colIdx})">${ano} <span id="sort-arrow-${colIdx}">${arrowAno}</span>${fechaStr}</th>`;
             });
 
             renderizarTablaCompleta();
@@ -367,11 +379,8 @@
 
                             let oldVal = matriz[pais][ano];
 
-                            // Si el valor no cambia realmente, no hacemos nada
                             if (oldVal === newVal) return;
 
-                            // LÓGICA DE DESPLAZAMIENTO ROBUSTA (Shifting)
-                            // 1. Recogemos todos los países activos en este año y sus posiciones actuales
                             let activos = [];
                             paises.forEach(p => {
                                 if (!(retiradas[p] && retiradas[p][ano] === true)) {
@@ -382,12 +391,9 @@
                                 }
                             });
 
-                            // Ordenar por su posición actual
                             activos.sort((a, b) => a.rank - b.rank);
 
-                            // Si el país no tenía posición previa asignada (estaba vacía)
                             if (oldVal === undefined || oldVal === null || isNaN(oldVal)) {
-                                // Insertamos el país en la posición newVal desplazando los demás hacia abajo
                                 activos.forEach(item => {
                                     if (item.rank >= newVal) {
                                         item.rank += 1;
@@ -395,19 +401,14 @@
                                 });
                                 activos.push({ pais: pais, rank: newVal });
                             } else {
-                                // Si ya tenía posición, removemos o reordenamos simulando el cambio
-                                // Quitamos temporalmente al país modificado de la lista
                                 let filtrados = activos.filter(item => item.pais !== pais);
                                 
-                                // Insertamos en la nueva posición y reajustamos el resto
                                 filtrados.forEach(item => {
-                                    // Si pasamos de una posición baja a una alta (ej: 1 a 3)
                                     if (oldVal < newVal) {
                                         if (item.rank > oldVal && item.rank <= newVal) {
                                             item.rank -= 1;
                                         }
                                     } 
-                                    // Si pasamos de una posición alta a una baja (ej: 3 a 1)
                                     else {
                                         if (item.rank >= newVal && item.rank < oldVal) {
                                             item.rank += 1;
@@ -418,20 +419,14 @@
                                 activos = filtrados;
                             }
 
-                            // Asegurar que los rangos sean secuenciales y limpios de 1 en adelante
                             activos.sort((a, b) => a.rank - b.rank);
                             
-                            // Aplicamos los nuevos valores a la matriz global y registramos los cambios de cada afectado
                             activos.forEach((item, idx) => {
-                                let calculatedRank = idx + 1; // Forzar continuidad si se desea, o usar item.rank
-                                // Usamos item.rank respetando el hueco exacto introducido:
                                 let finalRank = item.rank;
-                                
                                 matriz[item.pais][ano] = finalRank;
                                 registrarCambio(item.pais, ano, finalRank);
                             });
 
-                            // Refrescamos toda la tabla para mostrar los cambios visuales de todas las filas afectadas
                             renderizarTablaCompleta();
                         });
 
@@ -462,7 +457,6 @@
             const paisesOrdenados = [...paises].sort();
             let anosAfectados = new Set();
 
-            // Iteramos EXCLUSIVAMENTE sobre las celdas que realmente se encuentran en cambiosPendientes
             for (const key in window.cambiosPendientes) {
                 const [p, anoStr] = key.split('|');
                 const ano = parseInt(anoStr);
@@ -513,12 +507,10 @@
                     window.tablaData.fechasPorAnio[ano] = hoy;
                 });
                 
-                // Actualizamos los valores originales con los nuevos ya guardados
                 for (const key in window.cambiosPendientes) {
                     window.valoresOriginales[key] = window.cambiosPendientes[key];
                 }
 
-                // Limpiamos la lista de pendientes
                 window.cambiosPendientes = {};
                 
                 renderizarCabecerasYTabla();
@@ -589,12 +581,14 @@
                     if (isMissingA && isMissingB) return 0;
                 }
 
+                // CORRECCIÓN: Invertir adecuadamente según la dirección (ascendente/descendente)
                 if (valA < valB) return sortDirection ? 1 : -1;
-                if (valA > valB) return sortDirection ? 1 : -1;
+                if (valA > valB) return sortDirection ? -1 : 1;
                 return 0;
             });
 
-            renderizarTablaCompleta();
+            // Redibujar cabeceras para actualizar las flechas visuales e imprimir la tabla ordenada
+            renderizarCabecerasYTabla();
         }
 
         cargarDatos();
