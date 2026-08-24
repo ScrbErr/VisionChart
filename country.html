@@ -286,6 +286,7 @@
             rankings.forEach(item => {
                 if (item.country && item.year) {
                     let val = item.position;
+                    // Si está retirado según la tabla festival, forzamos '//'
                     if (retiradosMap[item.year] && retiradosMap[item.year][item.country]) {
                         val = '//';
                     }
@@ -342,7 +343,7 @@
                 paises.forEach(p => {
                     let v = matriz[ano] && matriz[ano][p];
                     let isW = retiradosMap[ano] && retiradosMap[ano][p];
-                    if (v !== undefined && v !== '' && v !== null && !isW) {
+                    if (v !== undefined && v !== '' && v !== null && !isW && v !== '//') {
                         activosEnAno++;
                     }
                 });
@@ -374,7 +375,7 @@
                     }
 
                     input.addEventListener('change', (e) => {
-                        handleInputChange(e, activosEnAno);
+                        handleInputChange(e, activosEnAno, ano);
                     });
 
                     let key = `${ano}|${pais}`;
@@ -389,7 +390,7 @@
             });
         }
 
-        function handleInputChange(e, maxVal) {
+        function handleInputChange(e, maxVal, ano) {
             let input = e.target;
             let y = input.dataset.year;
             let c = input.dataset.country;
@@ -399,27 +400,38 @@
                 input.value = window.valoresOriginales[`${y}|${c}`] || '';
                 return;
             }
+
+            // Si se pasa del máximo permitido para ese año, lo limitamos al máximo
             if (nuevoVal > maxVal) nuevoVal = maxVal;
-            input.value = nuevoVal;
 
             let matrizAno = window.tablaData.matriz[y];
+            let paises = window.tablaData.paises;
+            let retiradosMap = window.tablaData.retiradosMap;
+
+            // Encontrar el país que actualmente ocupa la posición deseada (si lo hay) para hacer el desplazamiento (shift)
+            let paisAnteriorEnPosicion = null;
+            let valorAntiguoDelPais = matrizAno[c];
+
+            paises.forEach(p => {
+                if (p !== c && (!retiradosMap[y] || !retiradosMap[y][p])) {
+                    if (parseInt(matrizAno[p]) === nuevoVal) {
+                        paisAnteriorEnPosicion = p;
+                    }
+                }
+            });
+
+            // Asignar la nueva posición al país actual
             matrizAno[c] = nuevoVal;
+            window.cambiosPendientes[`${y}|${c}`] = nuevoVal;
 
-            // Actualizar solo la celda modificada sin alterar el resto de columnas de forma automática
-            let valActual = nuevoVal;
-            input.parentElement.className = obtenerClasePosicion(valActual);
-            
-            let original = window.valoresOriginales[`${y}|${c}`] !== undefined ? window.valoresOriginales[`${y}|${c}`] : '';
-            let key = `${y}|${c}`;
-
-            if (String(valActual) !== String(original)) {
-                input.classList.add('modificado');
-                window.cambiosPendientes[key] = valActual;
-            } else {
-                input.classList.remove('modificado');
-                delete window.cambiosPendientes[key];
+            // Si otro país tenía esa misma posición, lo desplazamos hacia abajo o hacia el hueco que dejó este país
+            if (paisAnteriorEnPosicion && valorAntiguoDelPais !== undefined && !isNaN(parseInt(valorAntiguoDelPais))) {
+                matrizAno[paisAnteriorEnPosicion] = parseInt(valorAntiguoDelPais);
+                window.cambiosPendientes[`${y}|${paisAnteriorEnPosicion}`] = parseInt(valorAntiguoDelPais);
             }
 
+            // Re-renderizar la tabla completa para reflejar los cambios desplazados instantáneamente
+            renderizarTablaCompleta();
             actualizarEstadoBotonGuardar();
         }
 
@@ -461,7 +473,7 @@
             const totalCambios = Object.keys(window.cambiosPendientes).length;
             if (totalCambios > 0) {
                 btn.classList.add('tiene-cambios');
-                btn.textContent = `💾 ACTUALIZAR (${totalCambios})`;
+                btn.textContent = `💾 ACTUALIZAR (${totalCambios} celdas)`;
             } else {
                 btn.classList.remove('tiene-cambios');
                 btn.textContent = `💾 ACTUALIZAR`;
@@ -503,7 +515,7 @@
                 }
 
                 window.cambiosPendientes = {};
-                document.querySelectorAll('.rank-input').forEach(i => i.classList.remove('modificado'));
+                renderizarTablaCompleta();
                 actualizarEstadoBotonGuardar();
 
                 statusDiv.textContent = "✅ ¡Cambios guardados con éxito en country_rankings!";
@@ -515,16 +527,14 @@
         }
 
         function deshacerCambios() {
-            document.querySelectorAll('.rank-input').forEach(input => {
-                let y = input.dataset.year;
-                let c = input.dataset.country;
-                let original = window.valoresOriginales[`${y}|${c}`];
-                input.value = original !== undefined && original !== null ? original : '';
-                input.classList.remove('modificado');
-                input.parentElement.className = obtenerClasePosicion(input.value);
-                window.tablaData.matriz[y][c] = input.value;
-            });
+            for (let key in window.valoresOriginales) {
+                let [y, c] = key.split('|');
+                if (window.tablaData.matriz[y]) {
+                    window.tablaData.matriz[y][c] = window.valoresOriginales[key];
+                }
+            }
             window.cambiosPendientes = {};
+            renderizarTablaCompleta();
             actualizarEstadoBotonGuardar();
             document.getElementById('status').textContent = "↩ Cambios descartados.";
             document.getElementById('status').style.color = '#8b949e';
