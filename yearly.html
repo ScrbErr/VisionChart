@@ -89,7 +89,7 @@
         
         .pos-none { background-color: #21262d; color: #8b949e; }      /* No participa // */
 
-        /* Estilo para hacer las celdas editables */
+        /* Estilo para hacer las celdas editables y ocultar flechas de número */
         .rank-input {
             background: transparent;
             border: none;
@@ -103,6 +103,17 @@
         .rank-input:focus {
             background: rgba(0, 210, 255, 0.2);
             border-radius: 4px;
+        }
+
+        /* Ocultar flechas en Chrome, Safari, Edge, Opera */
+        .rank-input::-webkit-outer-spin-button,
+        .rank-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        /* Ocultar flechas en Firefox */
+        .rank-input {
+            -moz-appearance: textfield;
         }
 
         #status { text-align: center; font-weight: bold; margin-bottom: 15px; }
@@ -263,20 +274,37 @@
                         input.value = (rank !== undefined && rank !== null && !isNaN(rank)) ? rank : '';
                         input.className = 'rank-input';
                         
+                        // Bloquear el ingreso de letras, símbolos o la tecla 'e'
+                        input.addEventListener('keydown', (e) => {
+                            if (['e', 'E', '+', '-', '.'].includes(e.key)) {
+                                e.preventDefault();
+                            }
+                        });
+
                         input.addEventListener('input', (e) => {
-                            let val = parseInt(e.target.value);
+                            let rawVal = e.target.value.replace(/[^0-9]/g, '');
+                            let val = parseInt(rawVal);
                             
-                            if (isNaN(e.target.value) || e.target.value === '') {
+                            if (rawVal === '') {
                                 matriz[pais][ano] = null;
+                                e.target.value = '';
                             } else {
                                 if (val < 1) val = 1;
                                 if (val > maxAllowed) val = maxAllowed;
-                                input.value = val;
+                                
+                                // Control de valores únicos para el mismo año
+                                for (let p of paises) {
+                                    if (p !== pais && matriz[p][ano] === val) {
+                                        matriz[p][ano] = null; // Limpia el duplicado anterior si se repite
+                                    }
+                                }
+
+                                e.target.value = val;
                                 matriz[pais][ano] = val;
                             }
 
-                            // Refrescar colores de toda la columna dinámicamente
-                            actualizarColoresColumna(ano);
+                            // Refrescar toda la tabla para actualizar visualmente duplicados y colores
+                            renderizarTablaCompletaInputs(false); 
                         });
 
                         td.appendChild(input);
@@ -290,26 +318,33 @@
             });
         }
 
-        function actualizarColoresColumna(anoTarget) {
-            const { paises, anos, matriz, retiradas } = window.tablaData;
-            const { maxRangoPorAnio } = calcularMaximosYParticipantes(paises, anos, matriz, retiradas);
-            let anoIndex = anos.indexOf(anoTarget);
-            if (anoIndex === -1) return;
+        // Renderizado rápido que no destruye el foco del input actual
+        function renderizarTablaCompletaInputs(rebuild = true) {
+            if (rebuild) {
+                renderizarTablaCompleta();
+            } else {
+                const { paises, anos, matriz, retiradas } = window.tablaData;
+                const { maxRangoPorAnio } = calcularMaximosYParticipantes(paises, anos, matriz, retiradas);
+                const rows = document.getElementById('table-body').rows;
 
-            const rows = document.getElementById('table-body').rows;
-            let maxR = maxRangoPorAnio[anoTarget];
+                paises.forEach((pais, i) => {
+                    anos.forEach((ano, j) => {
+                        let td = rows[i].cells[j + 1];
+                        let rank = matriz[pais][ano];
+                        let isWithdrawn = retiradas[pais] && retiradas[pais][ano] === true;
+                        let maxR = maxRangoPorAnio[ano] || 25;
 
-            for (let i = 0; i < rows.length; i++) {
-                let pais = paises[i];
-                let td = rows[i].cells[anoIndex + 1];
-                let rank = matriz[pais][anoTarget];
-                let isWithdrawn = retiradas[pais] && retiradas[pais][anoTarget] === true;
-
-                if (!isWithdrawn && rank !== undefined && rank !== null && !isNaN(rank)) {
-                    td.className = obtenerClasePosicion(rank, maxR);
-                } else if (!isWithdrawn) {
-                    td.className = 'pos-none';
-                }
+                        if (!isWithdrawn) {
+                            let input = td.querySelector('.rank-input');
+                            if (input && document.activeElement !== input) {
+                                input.value = (rank !== undefined && rank !== null && !isNaN(rank)) ? rank : '';
+                            }
+                            td.className = (rank !== undefined && rank !== null && !isNaN(rank)) 
+                                ? obtenerClasePosicion(rank, maxR) 
+                                : 'pos-none';
+                        }
+                    });
+                });
             }
         }
 
@@ -363,7 +398,6 @@
                     }
                 }
 
-                // Forzar siempre que los vacíos o retirados vayan al fondo sin importar la dirección del orden
                 if (colIndex !== 0) {
                     if (isMissingA && !isMissingB) return 1;
                     if (!isMissingA && isMissingB) return -1;
