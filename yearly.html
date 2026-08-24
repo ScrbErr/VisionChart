@@ -127,6 +127,13 @@
             border-radius: 4px;
         }
 
+        /* Indicador visual de celda modificada sin guardar */
+        .rank-input.modificado {
+            background: rgba(224, 138, 30, 0.3);
+            border-radius: 4px;
+            border: 1px dashed #e08a1e;
+        }
+
         .rank-input::-webkit-outer-spin-button,
         .rank-input::-webkit-inner-spin-button {
             -webkit-appearance: none;
@@ -142,6 +149,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            gap: 15px;
             margin-top: 20px;
             background: #161b22;
             padding: 15px 20px;
@@ -162,6 +170,48 @@
         }
         .btn-update:hover {
             background-color: #2ea043;
+        }
+
+        /* Animación de pulso para indicar cambios pendientes */
+        @keyframes pulse-warning {
+            0% { box-shadow: 0 0 0 0 rgba(224, 138, 30, 0.6); }
+            70% { box-shadow: 0 0 0 10px rgba(224, 138, 30, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(224, 138, 30, 0); }
+        }
+
+        .btn-update.tiene-cambios {
+            background-color: #b08800;
+            animation: pulse-warning 1.5s infinite;
+        }
+
+        .btn-undo {
+            background-color: #da3633;
+            color: #fff;
+            border: none;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-undo:hover {
+            background-color: #f85149;
+        }
+
+        .btn-export {
+            background-color: #1f6feb;
+            color: #fff;
+            border: none;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-export:hover {
+            background-color: #388bfd;
         }
 
         /* SECCIÓN DE ESTADÍSTICAS */
@@ -263,7 +313,9 @@
         </div>
 
         <div class="action-bar">
-            <button class="btn-update" onclick="guardarCambiosEnSupabase()">💾 ACTUALIZAR</button>
+            <button id="btnActualizar" class="btn-update" onclick="guardarCambiosEnSupabase()">💾 ACTUALIZAR</button>
+            <button class="btn-undo" onclick="deshacerCambios()">↩ DESHACER</button>
+            <button class="btn-export" onclick="exportarCSV()">📥 EXPORTAR CSV</button>
         </div>
 
         <!-- SECCIÓN DE ESTADÍSTICAS -->
@@ -310,6 +362,72 @@
             } else {
                 window.cambiosPendientes[key] = valor;
             }
+            actualizarEstadoVisualBotones();
+        }
+
+        function actualizarEstadoVisualBotones() {
+            const btn = document.getElementById('btnActualizar');
+            const hayCambios = Object.keys(window.cambiosPendientes).length > 0;
+            if (hayCambios) {
+                btn.classList.add('tiene-cambios');
+                btn.textContent = `💾 ACTUALIZAR (${Object.keys(window.cambiosPendientes).length})`;
+            } else {
+                btn.classList.remove('tiene-cambios');
+                btn.textContent = "💾 ACTUALIZAR";
+            }
+        }
+
+        function deshacerCambios() {
+            if (Object.keys(window.cambiosPendientes).length === 0) {
+                alert("No hay cambios pendientes por deshacer.");
+                return;
+            }
+            if (confirm("¿Estás seguro de que deseas revertir todas las modificaciones no guardadas?")) {
+                const { matriz } = window.tablaData;
+                for (const key in window.cambiosPendientes) {
+                    const [pais, anoStr] = key.split('|');
+                    const ano = parseInt(anoStr);
+                    matriz[pais][ano] = window.valoresOriginales[key] !== undefined ? window.valoresOriginales[key] : null;
+                }
+                window.cambiosPendientes = {};
+                renderizarTablaCompleta();
+                renderizarEstadisticas();
+                actualizarEstadoVisualBotones();
+                document.getElementById('status').textContent = "↩ Cambios no guardados descartados.";
+                document.getElementById('status').style.color = '#8b949e';
+            }
+        }
+
+        function exportarCSV() {
+            const { paises, anos, matriz, retiradas } = window.tablaData;
+            if (!paises || paises.length === 0) {
+                alert("No hay datos para exportar.");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,País," + anos.join(",") + "\n";
+
+            paises.forEach(pais => {
+                let row = [`"${pais}"`];
+                anos.forEach(ano => {
+                    let isWithdrawn = retiradas[pais] && retiradas[pais][ano] === true;
+                    if (isWithdrawn) {
+                        row.push('"//"');
+                    } else {
+                        let rank = matriz[pais][ano];
+                        row.push((rank !== undefined && rank !== null && !isNaN(rank)) ? rank : "");
+                    }
+                });
+                csvContent += row.join(",") + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `visionchart_posiciones_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         async function cargarDatos() {
@@ -391,6 +509,7 @@
             window.cambiosPendientes = {}; 
             renderizarCabecerasYTabla();
             renderizarEstadisticas();
+            actualizarEstadoVisualBotones();
         }
 
         function renderizarCabecerasYTabla() {
@@ -476,6 +595,12 @@
                         input.value = (rank !== undefined && rank !== null && !isNaN(rank)) ? rank : '';
                         input.className = 'rank-input';
                         
+                        // Añadir clase visual si el valor ha cambiado respecto al original
+                        const keyCheck = `${pais}|${ano}`;
+                        if (window.valoresOriginales[keyCheck] !== rank) {
+                            input.classList.add('modificado');
+                        }
+
                         input.addEventListener('keydown', (e) => {
                             if (['e', 'E', '+', '-', '.'].includes(e.key)) {
                                 e.preventDefault();
@@ -666,6 +791,7 @@
                 statusDiv.textContent = "ℹ️ No hay posiciones válidas para guardar.";
                 statusDiv.style.color = '#e08a1e';
                 window.cambiosPendientes = {};
+                actualizarEstadoVisualBotones();
                 return;
             }
 
@@ -698,6 +824,7 @@
                 
                 renderizarCabecerasYTabla();
                 renderizarEstadisticas();
+                actualizarEstadoVisualBotones();
 
                 statusDiv.textContent = `✅ ¡${registrosParaGuardar.length} posiciones actualizadas con éxito (${hoy})!`;
                 statusDiv.style.color = '#3fb950';
