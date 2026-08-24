@@ -286,7 +286,6 @@
             rankings.forEach(item => {
                 if (item.country && item.year) {
                     let val = item.position;
-                    // Si está retirado según la tabla festival, forzamos '//'
                     if (retiradosMap[item.year] && retiradosMap[item.year][item.country]) {
                         val = '//';
                     }
@@ -338,7 +337,7 @@
                 tdAno.textContent = ano;
                 tr.appendChild(tdAno);
 
-                // Calcular cuántos países participan realmente este año (excluyendo vacíos y retirados)
+                // Contar cuántos países participan realmente este año (excluyendo retirados y vacíos)
                 let activosEnAno = 0;
                 paises.forEach(p => {
                     let v = matriz[ano] && matriz[ano][p];
@@ -392,7 +391,7 @@
 
         function handleInputChange(e, maxVal, ano) {
             let input = e.target;
-            let y = input.dataset.year;
+            let y = ano;
             let c = input.dataset.country;
             let nuevoVal = parseInt(input.value);
 
@@ -400,39 +399,56 @@
                 input.value = window.valoresOriginales[`${y}|${c}`] || '';
                 return;
             }
-
-            // Si se pasa del máximo permitido para ese año, lo limitamos al máximo
             if (nuevoVal > maxVal) nuevoVal = maxVal;
 
             let matrizAno = window.tablaData.matriz[y];
-            let paises = window.tablaData.paises;
-            let retiradosMap = window.tablaData.retiradosMap;
+            let viejoVal = parseInt(matrizAno[c]);
 
-            // Encontrar el país que actualmente ocupa la posición deseada (si lo hay) para hacer el desplazamiento (shift)
-            let paisAnteriorEnPosicion = null;
-            let valorAntiguoDelPais = matrizAno[c];
-
-            paises.forEach(p => {
-                if (p !== c && (!retiradosMap[y] || !retiradosMap[y][p])) {
-                    if (parseInt(matrizAno[p]) === nuevoVal) {
-                        paisAnteriorEnPosicion = p;
+            // Lógica de desplazamiento por año para mantener posiciones únicas
+            if (!isNaN(viejoVal) && viejoVal !== nuevoVal) {
+                if (nuevoVal > viejoVal) {
+                    // Si el número aumenta, los que estaban entre viejo y nuevo bajan una posición
+                    for (let p in matrizAno) {
+                        if (p !== c) {
+                            let pVal = parseInt(matrizAno[p]);
+                            if (!isNaN(pVal) && pVal > viejoVal && pVal <= nuevoVal) {
+                                matrizAno[p] = pVal - 1;
+                                registrarCambio(y, p, matrizAno[p]);
+                            }
+                        }
+                    }
+                } else {
+                    // Si el número disminuye, los que estaban entre nuevo y viejo suben una posición
+                    for (let p in matrizAno) {
+                        if (p !== c) {
+                            let pVal = parseInt(matrizAno[p]);
+                            if (!isNaN(pVal) && pVal >= nuevoVal && pVal < viejoVal) {
+                                matrizAno[p] = pVal + 1;
+                                registrarCambio(y, p, matrizAno[p]);
+                            }
+                        }
                     }
                 }
-            });
-
-            // Asignar la nueva posición al país actual
-            matrizAno[c] = nuevoVal;
-            window.cambiosPendientes[`${y}|${c}`] = nuevoVal;
-
-            // Si otro país tenía esa misma posición, lo desplazamos hacia abajo o hacia el hueco que dejó este país
-            if (paisAnteriorEnPosicion && valorAntiguoDelPais !== undefined && !isNaN(parseInt(valorAntiguoDelPais))) {
-                matrizAno[paisAnteriorEnPosicion] = parseInt(valorAntiguoDelPais);
-                window.cambiosPendientes[`${y}|${paisAnteriorEnPosicion}`] = parseInt(valorAntiguoDelPais);
             }
 
-            // Re-renderizar la tabla completa para reflejar los cambios desplazados instantáneamente
+            matrizAno[c] = nuevoVal;
+            registrarCambio(y, c, nuevoVal);
+
+            // Re-renderizar la tabla para reflejar todos los cambios de desplazamiento en tiempo real
             renderizarTablaCompleta();
             actualizarEstadoBotonGuardar();
+        }
+
+        function registrarCambio(y, c, val) {
+            let key = `${y}|${c}`;
+            let original = window.valoresOriginales[key];
+            if (original === undefined) original = '';
+
+            if (String(val) !== String(original)) {
+                window.cambiosPendientes[key] = val;
+            } else {
+                delete window.cambiosPendientes[key];
+            }
         }
 
         function ordenarAnos() {
@@ -473,7 +489,7 @@
             const totalCambios = Object.keys(window.cambiosPendientes).length;
             if (totalCambios > 0) {
                 btn.classList.add('tiene-cambios');
-                btn.textContent = `💾 ACTUALIZAR (${totalCambios} celdas)`;
+                btn.textContent = `💾 ACTUALIZAR (${totalCambios})`;
             } else {
                 btn.classList.remove('tiene-cambios');
                 btn.textContent = `💾 ACTUALIZAR`;
