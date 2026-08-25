@@ -262,17 +262,21 @@
             const anosSet = new Set();
             const matriz = {}; 
             const retiradosMap = {}; 
+            const noWithdrawnCount = {}; // Conteo de participaciones (withdrawn === false) por país
 
-            // 1. Procesar la tabla FESTIVAL para detectar withdrawn de forma estricta (booleano true)
+            // 1. Procesar la tabla FESTIVAL para detectar withdrawn de forma estricta (booleano true/false)
             festival.forEach(f => {
                 if (f.country && f.year) {
                     paisesSet.add(f.country);
                     anosSet.add(f.year);
                     if (!retiradosMap[f.year]) retiradosMap[f.year] = {};
                     
-                    // Comprobación estricta del booleano true en withdrawn
                     if (f.withdrawn === true || f.withdrawn === 'true') {
                         retiradosMap[f.year][f.country] = true;
+                    } else {
+                        // Contar participaciones válidas (no retirado)
+                        if (!noWithdrawnCount[f.country]) noWithdrawnCount[f.country] = 0;
+                        noWithdrawnCount[f.country]++;
                     }
                 }
             });
@@ -313,7 +317,7 @@
                 }
             });
 
-            window.tablaData = { paises, anos, matriz, retiradosMap };
+            window.tablaData = { paises, anos, matriz, retiradosMap, noWithdrawnCount };
             renderizarTablaCompleta();
         }
 
@@ -369,7 +373,7 @@
                     td.className = obtenerClasePosicion(val);
 
                     let input = document.createElement('input');
-                    input.type = 'text'; // Usamos text pero validamos estrictamente en el evento para evitar letras
+                    input.type = 'text';
                     input.className = 'rank-input';
                     input.value = (val === '//') ? '//' : val;
                     input.dataset.year = ano;
@@ -380,7 +384,6 @@
                     }
 
                     input.addEventListener('input', (e) => {
-                        // Limpiar caracteres que no sean números instantáneamente
                         e.target.value = e.target.value.replace(/[^0-9]/g, '');
                     });
 
@@ -402,15 +405,23 @@
 
         function handleInputChange(e, ano) {
             let input = e.target;
-            let y = ano;
+            let y = String(ano);
             let c = input.dataset.country;
             let valStr = input.value.trim();
 
-            let matrizAno = window.tablaData.matriz[y];
-            if (!matrizAno) matrizAno = window.tablaData.matriz[y] = {};
+            let matriz = window.tablaData.matriz;
+            let anos = window.tablaData.anos;
+            let retiradosMap = window.tablaData.retiradosMap;
+            let noWithdrawnCount = window.tablaData.noWithdrawnCount;
 
+            // 1. Calcular posición máxima permitida por el país (número de no withdrawn / false)
+            let maxPosible = noWithdrawnCount[c] || anos.length;
+
+            if (!matriz[y]) matriz[y] = {};
+
+            // Si se vacía el campo
             if (valStr === '') {
-                matrizAno[c] = null;
+                matriz[y][c] = null;
                 registrarCambio(y, c, '');
                 renderizarTablaCompleta();
                 actualizarEstadoBotonGuardar();
@@ -418,12 +429,63 @@
             }
 
             let nuevoVal = parseInt(valStr);
-            if (isNaN(nuevoVal) || nuevoVal < 1 || nuevoVal > 99) { // Restringir posiciones lógicas entre 1 y 99
+            if (isNaN(nuevoVal) || nuevoVal < 1) {
                 input.value = window.valoresOriginales[`${y}|${c}`] || '';
                 return;
             }
 
-            matrizAno[c] = nuevoVal;
+            // 3. Si excede la posición máxima, colocar a la cola
+            // La última posición disponible real considera cuántas posiciones hay asignadas/válidas actuales o maxPosible
+            let posicionesAsignadas = 0;
+            anos.forEach(a => {
+                if (!retiradosMap[a]?.[c] && matriz[a]?.[c] !== null && matriz[a]?.[c] !== undefined && matriz[a]?.[c] !== '') {
+                    posicionesAsignadas++;
+                }
+            });
+            
+            // Límite estricto según regla 1 y regla 3
+            let limiteReal = Math.min(maxPosible, Math.max(posicionesAsignadas, 1));
+            if (nuevoVal > maxPosible) {
+                nuevoVal = limiteReal;
+            }
+
+            let viejoVal = matriz[y][c];
+            let viejoNum = (viejoVal !== null && viejoVal !== undefined && viejoVal !== '' && viejoVal !== '//') ? parseInt(viejoVal) : null;
+
+            // 2. Reordenamiento en cascada para el resto de los años de ese país
+            anos.forEach(a => {
+                if (a === y) return;
+                if (retiradosMap[a]?.[c]) return; // Ignorar retirados
+
+                let valActual = matriz[a]?.[c];
+                if (valActual === null || valActual === undefined || valActual === '' || valActual === '//') return;
+                let numActual = parseInt(valActual);
+                if (isNaN(numActual)) return;
+
+                // Caso A: Bajamos un año de posición (ej. de 1 a 10) -> los que estaban entre el 2 y 10 bajan una posición (1 a 9)
+                if (viejoNum !== null && nuevoVal > viejoNum) {
+                    if (numActual > viejoNum && numActual <= nuevoVal) {
+                        matriz[a][c] = numActual - 1;
+                        registrarCambio(a, c, matriz[a][c]);
+                    }
+                } 
+                // Caso B: Subimos un año de posición (ej. de 12 a 3) -> los que estaban entre 3 y 11 suben una posición (4 a 12)
+                else if (viejoNum !== null && nuevoVal < viejoNum) {
+                    if (numActual >= nuevoVal && numActual < viejoNum) {
+                        matriz[a][c] = numActual + 1;
+                        registrarCambio(a, c, matriz[a][c]);
+                    }
+                }
+                // Caso C: Si antes era null/vacío y asignamos una posición, desplazamos los mayores o iguales
+                else if (viejoNum === null) {
+                    if (numActual >= nuevoVal) {
+                        matriz[a][c] = numActual + 1;
+                        registrarCambio(a, c, matriz[a][c]);
+                    }
+                }
+            });
+
+            matriz[y][c] = nuevoVal;
             registrarCambio(y, c, nuevoVal);
 
             renderizarTablaCompleta();
