@@ -595,14 +595,14 @@
                     if (position === '' || position === null) position = null;
                     else position = parseInt(position);
 
-                    // Formato exacto de ID tal y como lo usa tu SQL (ej. 00606)
+                    // Formato exacto de ID idéntico al que te funcionó en el SQL Editor
                     let countryIndex = paisesOrdenados.indexOf(country) + 1;
                     let countryCodeStr = String(countryIndex).padStart(2, '0');
                     let yearCodeStr = String(year).slice(-3);
                     let generatedId = yearCodeStr + countryCodeStr;
 
-                    // Petición POST exacta idéntica a la que te funcionó en la consola SQL de Supabase
-                    const response = await fetch(`${SUPABASE_URL}/country_rankings?on_conflict=country,year`, {
+                    // CORRECCIÓN: El conflicto se resuelve por la clave primaria 'id', evitando el error 42P10
+                    const response = await fetch(`${SUPABASE_URL}/country_rankings?on_conflict=id`, {
                         method: 'POST',
                         headers: {
                             'apikey': SUPABASE_ANON_KEY,
