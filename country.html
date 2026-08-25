@@ -78,6 +78,14 @@
             background-color: #30363d;
         }
 
+        .th-date {
+            display: block;
+            font-size: 11px;
+            color: #8b949e;
+            font-weight: normal;
+            margin-top: 2px;
+        }
+
         /* Colores de posiciones */
         .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; }
         .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; }
@@ -227,14 +235,16 @@
 
         window.cambiosPendientes = {};
         window.valoresOriginales = {};
+        window.fechasActualizacion = {}; // Almacenará la fecha máxima por año o país según corresponda
         window.ordenColumnaAsc = {}; 
         window.ordenAnoAsc = false;
 
         async function cargarDatos() {
             const statusDiv = document.getElementById('status');
             try {
+                // Solicitamos también el campo de fecha (ej. 'date' o 'updated_at', ajusta el nombre si en tu BBDD se llama diferente, aquí asumimos 'date')
                 const [resRankings, resFestival] = await Promise.all([
-                    fetch(`${SUPABASE_URL}/country_rankings?select=country,year,position`, {
+                    fetch(`${SUPABASE_URL}/country_rankings?select=country,year,position,date`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
                     }),
                     fetch(`${SUPABASE_URL}/festival?select=country,year,withdrawn`, {
@@ -302,6 +312,12 @@
             rankings.forEach(item => {
                 if (item.country && item.year) {
                     let key = `${item.year}|${item.country}`;
+                    
+                    // Guardamos la fecha asociada a este país/año (si existe)
+                    if (item.date) {
+                        window.fechasActualizacion[item.country] = item.date.split('T')[0]; // Guardamos la fecha más reciente por país o ajusta la clave si es por año
+                    }
+
                     if (retiradosMap[item.year] && retiradosMap[item.year][item.country] === true) {
                         matriz[item.year][item.country] = '//';
                         window.valoresOriginales[key] = '//';
@@ -340,9 +356,11 @@
             
             const trHeaders = document.getElementById('table-headers');
             trHeaders.innerHTML = '<th onclick="ordenarAnos()">Año ↕</th>';
+            
             paises.forEach(pais => {
                 let th = document.createElement('th');
-                th.textContent = pais + ' ↕';
+                let fechaStr = window.fechasActualizacion[pais] || '';
+                th.innerHTML = `${pais} ↕<span class="th-date">${fechaStr}</span>`;
                 th.onclick = () => ordenarColumna(pais);
                 trHeaders.appendChild(th);
             });
@@ -413,7 +431,6 @@
             let maxPosible = noWithdrawnCount[c] || anos.length;
             if (!matriz[y]) matriz[y] = {};
 
-            // 1. Si se vacía el campo (borrar posición)
             if (valStr === '') {
                 let viejoVal = matriz[y][c];
                 let viejoNum = (viejoVal !== null && viejoVal !== undefined && viejoVal !== '' && viejoVal !== '//') ? parseInt(viejoVal) : null;
@@ -421,7 +438,6 @@
                 matriz[y][c] = null;
                 registrarCambio(y, c, '');
 
-                // Reordenar en cascada descendente los elementos que estaban por debajo para cerrar el hueco
                 if (viejoNum !== null) {
                     anos.forEach(a => {
                         if (a === y) return;
@@ -450,7 +466,6 @@
                 return;
             }
 
-            // Calcular cuántas posiciones válidas hay asignadas actualmente para este país
             let posicionesAsignadas = 0;
             anos.forEach(a => {
                 if (!retiradosMap[a]?.[c] && matriz[a]?.[c] !== null && matriz[a]?.[c] !== undefined && matriz[a]?.[c] !== '') {
@@ -458,7 +473,6 @@
                 }
             });
 
-            // Si el valor introducido es mayor que el número de elementos existentes, se coloca exactamente a la cola (+1)
             let viejoVal = matriz[y][c];
             let viejoNum = (viejoVal !== null && viejoVal !== undefined && viejoVal !== '' && viejoVal !== '//') ? parseInt(viejoVal) : null;
             
@@ -469,7 +483,6 @@
                 nuevoVal = Math.min(maxPosible, siguienteCola);
             }
 
-            // 2. Reordenamiento en cascada para el resto de los años
             anos.forEach(a => {
                 if (a === y) return;
                 if (retiradosMap[a]?.[c]) return;
@@ -572,36 +585,46 @@
                 return;
             }
 
-            statusDiv.textContent = "⏳ Guardando cambios en Supabase...";
+            statusDiv.textContent = "⏳ Guardando nuevos registros en Supabase...";
             statusDiv.style.color = '#00d2ff';
 
             try {
+                // Obtener fecha de hoy en formato YYYY-MM-DD
+                const today = new Date().toISOString().split('T')[0];
+
                 for (let key of keys) {
                     let [year, country] = key.split('|');
                     let position = window.cambiosPendientes[key];
                     if (position === '') position = null;
 
-                    const response = await fetch(`${SUPABASE_URL}/country_rankings?country=eq.${encodeURIComponent(country)}&year=eq.${year}`, {
-                        method: 'PATCH',
+                    // En lugar de PATCH, usamos POST para crear un nuevo registro
+                    const response = await fetch(`${SUPABASE_URL}/country_rankings`, {
+                        method: 'POST',
                         headers: {
                             'apikey': SUPABASE_ANON_KEY,
                             'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
                             'Content-Type': 'application/json',
                             'Prefer': 'return=minimal'
                         },
-                        body: JSON.stringify({ position: position })
+                        body: JSON.stringify({
+                            country: country,
+                            year: parseInt(year),
+                            position: position,
+                            date: today // Pasamos la fecha de hoy
+                        })
                     });
 
-                    if (!response.ok) throw new Error(`Error al actualizar ${country} en ${year}`);
+                    if (!response.ok) throw new Error(`Error al crear registro para ${country} en ${year}`);
 
                     window.valoresOriginales[key] = position;
+                    window.fechasActualizacion[country] = today; // Actualizamos la fecha en pantalla
                 }
 
                 window.cambiosPendientes = {};
                 renderizarTablaCompleta();
                 actualizarEstadoBotonGuardar();
 
-                statusDiv.textContent = "✅ ¡Cambios guardados con éxito en country_rankings!";
+                statusDiv.textContent = "✅ ¡Nuevos registros creados con éxito en country_rankings!";
                 statusDiv.style.color = '#3fb950';
             } catch (err) {
                 statusDiv.textContent = "❌ Error al guardar: " + err.message;
