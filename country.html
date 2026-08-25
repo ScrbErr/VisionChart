@@ -262,9 +262,8 @@
             const anosSet = new Set();
             const matriz = {}; 
             const retiradosMap = {}; 
-            const noWithdrawnCount = {}; // Conteo de participaciones (withdrawn === false) por país
+            const noWithdrawnCount = {}; 
 
-            // 1. Procesar la tabla FESTIVAL para detectar withdrawn de forma estricta (booleano true/false)
             festival.forEach(f => {
                 if (f.country && f.year) {
                     paisesSet.add(f.country);
@@ -274,7 +273,6 @@
                     if (f.withdrawn === true || f.withdrawn === 'true') {
                         retiradosMap[f.year][f.country] = true;
                     } else {
-                        // Contar participaciones válidas (no retirado)
                         if (!noWithdrawnCount[f.country]) noWithdrawnCount[f.country] = 0;
                         noWithdrawnCount[f.country]++;
                     }
@@ -291,7 +289,6 @@
 
             anos.forEach(ano => matriz[ano] = {});
 
-            // 2. Rellenar matriz aplicando '//' si el festival marca withdrawn = true
             anos.forEach(ano => {
                 paises.forEach(pais => {
                     let key = `${ano}|${pais}`;
@@ -302,7 +299,6 @@
                 });
             });
 
-            // 3. Rellenar con los rankings de Supabase siempre que no esté retirado
             rankings.forEach(item => {
                 if (item.country && item.year) {
                     let key = `${item.year}|${item.country}`;
@@ -414,15 +410,35 @@
             let retiradosMap = window.tablaData.retiradosMap;
             let noWithdrawnCount = window.tablaData.noWithdrawnCount;
 
-            // 1. Calcular posición máxima permitida por el país (número de no withdrawn / false)
             let maxPosible = noWithdrawnCount[c] || anos.length;
-
             if (!matriz[y]) matriz[y] = {};
 
-            // Si se vacía el campo
+            // 1. Si se vacía el campo (borrar posición)
             if (valStr === '') {
+                let viejoVal = matriz[y][c];
+                let viejoNum = (viejoVal !== null && viejoVal !== undefined && viejoVal !== '' && viejoVal !== '//') ? parseInt(viejoVal) : null;
+
                 matriz[y][c] = null;
                 registrarCambio(y, c, '');
+
+                // Reordenar en cascada descendente los elementos que estaban por debajo para cerrar el hueco
+                if (viejoNum !== null) {
+                    anos.forEach(a => {
+                        if (a === y) return;
+                        if (retiradosMap[a]?.[c]) return;
+
+                        let valActual = matriz[a]?.[c];
+                        if (valActual === null || valActual === undefined || valActual === '' || valActual === '//') return;
+                        let numActual = parseInt(valActual);
+                        if (isNaN(numActual)) return;
+
+                        if (numActual > viejoNum) {
+                            matriz[a][c] = numActual - 1;
+                            registrarCambio(a, c, matriz[a][c]);
+                        }
+                    });
+                }
+
                 renderizarTablaCompleta();
                 actualizarEstadoBotonGuardar();
                 return;
@@ -434,49 +450,47 @@
                 return;
             }
 
-            // 3. Si excede la posición máxima, colocar a la cola
-            // La última posición disponible real considera cuántas posiciones hay asignadas/válidas actuales o maxPosible
+            // Calcular cuántas posiciones válidas hay asignadas actualmente para este país
             let posicionesAsignadas = 0;
             anos.forEach(a => {
                 if (!retiradosMap[a]?.[c] && matriz[a]?.[c] !== null && matriz[a]?.[c] !== undefined && matriz[a]?.[c] !== '') {
                     posicionesAsignadas++;
                 }
             });
-            
-            // Límite estricto según regla 1 y regla 3
-            let limiteReal = Math.min(maxPosible, Math.max(posicionesAsignadas, 1));
-            if (nuevoVal > maxPosible) {
-                nuevoVal = limiteReal;
-            }
 
+            // Si el valor introducido es mayor que el número de elementos existentes, se coloca exactamente a la cola (+1)
             let viejoVal = matriz[y][c];
             let viejoNum = (viejoVal !== null && viejoVal !== undefined && viejoVal !== '' && viejoVal !== '//') ? parseInt(viejoVal) : null;
+            
+            let totalActivos = posicionesAsignadas - (viejoNum !== null ? 1 : 0);
+            let siguienteCola = totalActivos + 1;
 
-            // 2. Reordenamiento en cascada para el resto de los años de ese país
+            if (nuevoVal > siguienteCola) {
+                nuevoVal = Math.min(maxPosible, siguienteCola);
+            }
+
+            // 2. Reordenamiento en cascada para el resto de los años
             anos.forEach(a => {
                 if (a === y) return;
-                if (retiradosMap[a]?.[c]) return; // Ignorar retirados
+                if (retiradosMap[a]?.[c]) return;
 
                 let valActual = matriz[a]?.[c];
                 if (valActual === null || valActual === undefined || valActual === '' || valActual === '//') return;
                 let numActual = parseInt(valActual);
                 if (isNaN(numActual)) return;
 
-                // Caso A: Bajamos un año de posición (ej. de 1 a 10) -> los que estaban entre el 2 y 10 bajan una posición (1 a 9)
                 if (viejoNum !== null && nuevoVal > viejoNum) {
                     if (numActual > viejoNum && numActual <= nuevoVal) {
                         matriz[a][c] = numActual - 1;
                         registrarCambio(a, c, matriz[a][c]);
                     }
                 } 
-                // Caso B: Subimos un año de posición (ej. de 12 a 3) -> los que estaban entre 3 y 11 suben una posición (4 a 12)
                 else if (viejoNum !== null && nuevoVal < viejoNum) {
                     if (numActual >= nuevoVal && numActual < viejoNum) {
                         matriz[a][c] = numActual + 1;
                         registrarCambio(a, c, matriz[a][c]);
                     }
                 }
-                // Caso C: Si antes era null/vacío y asignamos una posición, desplazamos los mayores o iguales
                 else if (viejoNum === null) {
                     if (numActual >= nuevoVal) {
                         matriz[a][c] = numActual + 1;
