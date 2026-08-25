@@ -235,14 +235,13 @@
 
         window.cambiosPendientes = {};
         window.valoresOriginales = {};
-        window.fechasActualizacion = {}; // Almacenará la fecha máxima por año o país según corresponda
+        window.fechasActualizacion = {}; 
         window.ordenColumnaAsc = {}; 
         window.ordenAnoAsc = false;
 
         async function cargarDatos() {
             const statusDiv = document.getElementById('status');
             try {
-                // Solicitamos también el campo de fecha (ej. 'date' o 'updated_at', ajusta el nombre si en tu BBDD se llama diferente, aquí asumimos 'date')
                 const [resRankings, resFestival] = await Promise.all([
                     fetch(`${SUPABASE_URL}/country_rankings?select=country,year,position,date`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
@@ -313,9 +312,8 @@
                 if (item.country && item.year) {
                     let key = `${item.year}|${item.country}`;
                     
-                    // Guardamos la fecha asociada a este país/año (si existe)
                     if (item.date) {
-                        window.fechasActualizacion[item.country] = item.date.split('T')[0]; // Guardamos la fecha más reciente por país o ajusta la clave si es por año
+                        window.fechasActualizacion[item.country] = item.date.split('T')[0];
                     }
 
                     if (retiradosMap[item.year] && retiradosMap[item.year][item.country] === true) {
@@ -585,11 +583,10 @@
                 return;
             }
 
-            statusDiv.textContent = "⏳ Guardando nuevos registros en Supabase...";
+            statusDiv.textContent = "⏳ Guardando registros en Supabase...";
             statusDiv.style.color = '#00d2ff';
 
             try {
-                // Obtener fecha de hoy en formato YYYY-MM-DD
                 const today = new Date().toISOString().split('T')[0];
 
                 for (let key of keys) {
@@ -597,34 +594,33 @@
                     let position = window.cambiosPendientes[key];
                     if (position === '') position = null;
 
-                    // En lugar de PATCH, usamos POST para crear un nuevo registro
-                    const response = await fetch(`${SUPABASE_URL}/country_rankings`, {
+                    const response = await fetch(`${SUPABASE_URL}/country_rankings?on_conflict=country,year`, {
                         method: 'POST',
                         headers: {
                             'apikey': SUPABASE_ANON_KEY,
                             'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
                             'Content-Type': 'application/json',
-                            'Prefer': 'return=minimal'
+                            'Prefer': 'resolution=merge-duplicates, return=minimal'
                         },
                         body: JSON.stringify({
                             country: country,
                             year: parseInt(year),
                             position: position,
-                            date: today // Pasamos la fecha de hoy
+                            date: today
                         })
                     });
 
-                    if (!response.ok) throw new Error(`Error al crear registro para ${country} en ${year}`);
+                    if (!response.ok) throw new Error(`Error al guardar registro para ${country} en ${year}`);
 
                     window.valoresOriginales[key] = position;
-                    window.fechasActualizacion[country] = today; // Actualizamos la fecha en pantalla
+                    window.fechasActualizacion[country] = today;
                 }
 
                 window.cambiosPendientes = {};
                 renderizarTablaCompleta();
                 actualizarEstadoBotonGuardar();
 
-                statusDiv.textContent = "✅ ¡Nuevos registros creados con éxito en country_rankings!";
+                statusDiv.textContent = "✅ ¡Registros actualizados con éxito en country_rankings!";
                 statusDiv.style.color = '#3fb950';
             } catch (err) {
                 statusDiv.textContent = "❌ Error al guardar: " + err.message;
