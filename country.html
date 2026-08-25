@@ -46,7 +46,6 @@
             border: 1px solid #30363d;
         }
 
-        /* Primera columna fija (Años) */
         th:first-child, td:first-child {
             position: sticky;
             left: 0;
@@ -86,7 +85,6 @@
             margin-top: 2px;
         }
 
-        /* Colores de posiciones */
         .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; }
         .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; }
         .pos-3 { background-color: #e08a1e !important; color: #000 !important; font-weight: bold; }
@@ -588,13 +586,22 @@
 
             try {
                 const today = new Date().toISOString().split('T')[0];
+                const paisesOrdenados = window.tablaData.paises;
 
                 for (let key of keys) {
-                    let [year, country] = key.split('|');
+                    let [yearStr, country] = key.split('|');
+                    let year = parseInt(yearStr);
                     let position = window.cambiosPendientes[key];
-                    if (position === '') position = null;
+                    if (position === '' || position === null) position = null;
+                    else position = parseInt(position);
 
-                    // Usamos UPSERT indicando que la clave única lógica es 'country,year'
+                    // Construcción del ID: código de 3 dígitos del año (ej. 2026 -> 026) + índice alfabético del país con 2 dígitos (ej. Albania -> 01) -> "02601"
+                    let countryIndex = paisesOrdenados.indexOf(country) + 1;
+                    let countryCodeStr = String(countryIndex).padStart(2, '0');
+                    let yearCodeStr = String(year).slice(-3);
+                    let generatedId = yearCodeStr + countryCodeStr;
+
+                    // Enviamos id, year, country, position y date asegurando que ninguno sea NULL según tu indicación
                     const response = await fetch(`${SUPABASE_URL}/country_rankings?on_conflict=country,year`, {
                         method: 'POST',
                         headers: {
@@ -604,8 +611,9 @@
                             'Prefer': 'resolution=merge-duplicates, return=minimal'
                         },
                         body: JSON.stringify({
+                            id: generatedId,
+                            year: year,
                             country: country,
-                            year: parseInt(year),
                             position: position,
                             date: today
                         })
@@ -619,7 +627,6 @@
 
                 window.cambiosPendientes = {};
                 renderizarTablaCompleta();
-                actualizarEstadoBotonGuardار = actualizarEstadoBotonGuardar; // mantenemos la llamada correcta
                 actualizarEstadoBotonGuardar();
 
                 statusDiv.textContent = "✅ ¡Registros actualizados con éxito en country_rankings!";
