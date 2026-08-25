@@ -601,14 +601,14 @@
                     let yearCodeStr = String(year).slice(-3);
                     let generatedId = yearCodeStr + countryCodeStr;
 
-                    // CORRECCIÓN: El conflicto se resuelve por la clave primaria 'id', evitando el error 42P10
-                    const response = await fetch(`${SUPABASE_URL}/country_rankings?on_conflict=id`, {
+                    // CORRECCIÓN: Inserción limpia POST pura sin restricciones de conflicto
+                    const response = await fetch(`${SUPABASE_URL}/country_rankings`, {
                         method: 'POST',
                         headers: {
                             'apikey': SUPABASE_ANON_KEY,
                             'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
                             'Content-Type': 'application/json',
-                            'Prefer': 'resolution=merge-duplicates, return=minimal'
+                            'Prefer': 'return=minimal'
                         },
                         body: JSON.stringify({
                             id: generatedId,
