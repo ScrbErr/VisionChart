@@ -595,13 +595,13 @@
                     if (position === '' || position === null) position = null;
                     else position = parseInt(position);
 
-                    // Construcción del ID: código de 3 dígitos del año (ej. 2026 -> 026) + índice alfabético del país con 2 dígitos (ej. Albania -> 01) -> "02601"
+                    // Formato exacto de ID tal y como lo usa tu SQL (ej. 00606)
                     let countryIndex = paisesOrdenados.indexOf(country) + 1;
                     let countryCodeStr = String(countryIndex).padStart(2, '0');
                     let yearCodeStr = String(year).slice(-3);
                     let generatedId = yearCodeStr + countryCodeStr;
 
-                    // Enviamos id, year, country, position y date asegurando que ninguno sea NULL según tu indicación
+                    // Petición POST exacta idéntica a la que te funcionó en la consola SQL de Supabase
                     const response = await fetch(`${SUPABASE_URL}/country_rankings?on_conflict=country,year`, {
                         method: 'POST',
                         headers: {
@@ -612,14 +612,17 @@
                         },
                         body: JSON.stringify({
                             id: generatedId,
-                            year: year,
                             country: country,
-                            position: position,
-                            date: today
+                            year: year,
+                            date: today,
+                            position: position
                         })
                     });
 
-                    if (!response.ok) throw new Error(`Error al actualizar registro para ${country} en ${year}`);
+                    if (!response.ok) {
+                        const errDetails = await response.text();
+                        throw new Error(`Error en Supabase (${response.status}): ${errDetails}`);
+                    }
 
                     window.valoresOriginales[key] = position;
                     window.fechasActualizacion[country] = today;
@@ -629,7 +632,7 @@
                 renderizarTablaCompleta();
                 actualizarEstadoBotonGuardar();
 
-                statusDiv.textContent = "✅ ¡Registros actualizados con éxito en country_rankings!";
+                statusDiv.textContent = "✅ ¡Registros guardados correctamente!";
                 statusDiv.style.color = '#3fb950';
             } catch (err) {
                 statusDiv.textContent = "❌ Error al guardar: " + err.message;
