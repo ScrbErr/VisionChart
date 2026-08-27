@@ -1,9 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8"><!DOCTYPE html>
-<html lang="es">
-<head>
     <meta charset="UTF-8">
     <title>Detalle de País - VisionChart</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -16,7 +13,7 @@
             background: #0d1117; 
             color: #c9d1d9; 
         }
-        h1 { color: #00d2ff; margin: 0; font-size: 24px; }
+        h1 { color: #00d2ff; margin: 0 0 8px 0; font-size: 24px; }
         .card { 
             background: #161b22; 
             padding: 20px; 
@@ -28,15 +25,21 @@
         .back-link { display: inline-block; margin-bottom: 12px; color: #00d2ff; text-decoration: none; font-weight: bold; font-size: 14px; }
         .back-link:hover { text-decoration: underline; }
 
-        /* Tarjeta Única Compacta */
+        /* Estructura Superior Optimizada */
         .unified-header {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 20px;
             flex-wrap: wrap;
             border-bottom: 1px solid #30363d;
             padding-bottom: 15px;
             margin-bottom: 15px;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
         }
         .country-flag {
             width: 100px;
@@ -48,41 +51,37 @@
             display: none;
             box-shadow: 0 2px 6px rgba(0,0,0,0.4);
         }
-        .header-info { flex: 1; }
         
-        .metrics-row {
+        /* Los 3 campos clave a la derecha y más grandes */
+        .header-metrics-right {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             flex-wrap: wrap;
-            margin-top: 10px;
         }
-        .metric-pill {
+        .metric-box-big {
             background: #0d1117;
             border: 1px solid #30363d;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 12px;
-            color: #8b949e;
+            padding: 10px 16px;
+            border-radius: 6px;
+            text-align: center;
+            min-width: 110px;
         }
-        .metric-pill strong {
+        .metric-box-big span {
+            display: block;
+            font-size: 11px;
+            color: #8b949e;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+        }
+        .metric-box-big strong {
             color: #00d2ff;
-            font-size: 14px;
-            margin-left: 4px;
+            font-size: 18px;
         }
 
-        /* Bloque Global y Décadas Integrado */
-        .section-title {
-            color: #e6edf3;
-            font-size: 14px;
-            font-weight: bold;
-            margin: 0 0 10px 0;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
+        /* Los 2 campos de Récords Globales ocupando el espacio superior */
         .global-records-inline {
             display: flex;
-            gap: 20px;
+            justify-content: space-around;
             background: #0d1117;
             padding: 10px 15px;
             border-radius: 6px;
@@ -91,11 +90,23 @@
             font-size: 13px;
             align-items: center;
             flex-wrap: wrap;
+            gap: 15px;
         }
         .global-records-inline span { color: #8b949e; }
         .global-records-inline strong { color: #e6edf3; margin-left: 5px; }
         .global-records-inline strong span { color: #00d2ff; font-weight: normal; }
 
+        /* Títulos de sección */
+        .section-title {
+            color: #e6edf3;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Cuadrícula de Décadas */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -139,7 +150,7 @@
         .decade-details div { display: flex; justify-content: space-between; }
         .decade-details span strong { color: #e6edf3; }
 
-        /* Tabla y Gráfica Compactas */
+        /* Tabla y Gráfica */
         .table-container { overflow-x: auto; margin-top: 10px; }
         table { width: 100%; border-collapse: collapse; background: #0d1117; border-radius: 6px; overflow: hidden; border: 1px solid #30363d; font-size: 13px; }
         th, td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #21262d; }
@@ -157,24 +168,38 @@
 
     <a href="index.html" class="back-link">← Volver al Inicio</a>
 
-    <!-- Tarjeta Única Unificada -->
+    <!-- Tarjeta Principal Reorganizada -->
     <div class="card">
         <div class="unified-header">
-            <img id="country-flag" class="country-flag" alt="Bandera">
-            <div class="header-info">
-                <h1 id="country-title">Cargando...</h1>
-                <div class="metrics-row">
-                    <div class="metric-pill">Nota General: <strong id="hero-avg-score">-</strong></div>
-                    <div class="metric-pill">Pos. Media: <strong id="hero-avg-rank">-</strong></div>
-                    <div class="metric-pill">Participaciones: <strong id="hero-participations">-</strong></div>
+            <div class="header-left">
+                <img id="country-flag" class="country-flag" alt="Bandera">
+                <div>
+                    <h1 id="country-title">Cargando...</h1>
+                    <span style="font-size: 12px; color: #8b949e;">Ficha técnica y rendimiento histórico</span>
+                </div>
+            </div>
+
+            <!-- Los 3 campos principales reubicados a la derecha -->
+            <div class="header-metrics-right">
+                <div class="metric-box-big">
+                    <span>Nota General</span>
+                    <strong id="hero-avg-score">-</strong>
+                </div>
+                <div class="metric-box-big">
+                    <span>Pos. Media</span>
+                    <strong id="hero-avg-rank">-</strong>
+                </div>
+                <div class="metric-box-big">
+                    <span>Participaciones</span>
+                    <strong id="hero-participations">-</strong>
                 </div>
             </div>
         </div>
 
-        <!-- Récords Globales en línea -->
+        <!-- Récords Globales ocupando el espacio superior solicitado -->
         <div class="global-records-inline" id="global-records-box" style="display: none;">
             <div><span>🏆 Mejor Nota Histórica:</span> <strong id="history-best-score">-</strong></div>
-            <div style="margin-left: auto;"><span>🥇 Mejor Posición Histórica:</span> <strong id="history-best-rank">-</strong></div>
+            <div><span>🥇 Mejor Posición Histórica:</span> <strong id="history-best-rank">-</strong></div>
         </div>
 
         <!-- Rendimiento por Décadas -->
@@ -215,7 +240,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const rawCountryName = urlParams.get('nombre');
 
-        // Mapeo manual rápido de países de Eurovisión a códigos ISO de 2 letras (para asegurar banderas correctas siempre)
+        // Mapeo actualizado incluyendo Canadá ('ca')
         const countryCodes = {
             "Albania": "al", "Germany": "de", "Andorra": "ad", "Armenia": "am", "Australia": "au",
             "Austria": "at", "Azerbaijan": "az", "Belgium": "be", "Belarus": "by", "Bosnia and Herzegovina": "ba",
@@ -227,7 +252,7 @@
             "Poland": "pl", "Portugal": "pt", "United Kingdom": "gb", "Czech Republic": "cz", "Czechia": "cz",
             "Romania": "ro", "Russia": "ru", "San Marino": "sm", "Serbia": "rs", "Sweden": "se",
             "Switzerland": "ch", "Turkey": "tr", "Ukraine": "ua", "Serbia and Montenegro": "cs", "Morocco": "ma",
-            "Luxembourg": "lu", "Monaco": "mc", "Yugoslavia": "yu", "Portugal": "pt"
+            "Luxembourg": "lu", "Monaco": "mc", "Yugoslavia": "yu", "Canada": "ca"
         };
 
         async function cargarDatosPais() {
@@ -275,442 +300,9 @@
             const code = countryCodes[countryName];
             if (code) {
                 const flagImg = document.getElementById('country-flag');
-                // Usando flagcdn.com (fiable y sin problemas de deprecación)
                 flagImg.src = `https://flagcdn.com/w320/${code.toLowerCase()}.png`;
                 flagImg.style.display = 'block';
             }
-        }
-
-        function procesarEstadisticasCabecera(scoresData, yearlyData, festivalMap) {
-            const scoresValidos = scoresData.filter(i => i.score !== null && !isNaN(i.score));
-            if (scoresValidos.length === 0) return;
-
-            const sumaScores = scoresValidos.reduce((acc, curr) => acc + Number(curr.score), 0);
-            document.getElementById('hero-avg-score').textContent = (sumaScores / scoresValidos.length).toFixed(2);
-
-            const ranksValidos = yearlyData.filter(i => i.rank !== null && !isNaN(i.rank));
-            if (ranksValidos.length > 0) {
-                const sumaRanks = ranksValidos.reduce((acc, curr) => acc + Number(curr.rank), 0);
-                document.getElementById('hero-avg-rank').textContent = `${(sumaRanks / ranksValidos.length).toFixed(1)}º`;
-            } else {
-                document.getElementById('hero-avg-rank').textContent = 'N/A';
-            }
-
-            let participaciones = 0;
-            scoresData.forEach(item => {
-                const fest = festivalMap[item.year];
-                if (!fest || fest.withdrawn !== true) participaciones++;
-            });
-            document.getElementById('hero-participations').textContent = participaciones;
-
-            // Récords Globales
-            let mejorNota = scoresValidos.reduce((max, curr) => Number(curr.score) > Number(max.score) ? curr : max, scoresValidos[0]);
-            let mejorRank = ranksValidos.length > 0 ? ranksValidos.reduce((min, curr) => Number(curr.rank) < Number(min.rank) ? curr : min, ranksValidos[0]) : null;
-
-            document.getElementById('history-best-score').innerHTML = `${Number(mejorNota.score).toFixed(2)} <span>(${mejorNota.year})</span>`;
-            document.getElementById('history-best-rank').innerHTML = mejorRank ? `${mejorRank.rank}º <span>(${mejorRank.year})</span>` : 'N/A';
-            document.getElementById('global-records-box').style.display = 'flex';
-
-            // Décadas
-            const decadasMap = {};
-            scoresData.forEach(item => {
-                const decadaKey = Math.floor(item.year / 10) * 10 + 's';
-                if (!decadasMap[decadaKey]) decadasMap[decadaKey] = [];
-                const yearlyMatch = yearlyData.find(y => y.year === item.year);
-                decadasMap[decadaKey].push({
-                    year: item.year,
-                    score: item.score !== null ? Number(item.score) : null,
-                    rank: yearlyMatch && yearlyMatch.rank !== null ? Number(yearlyMatch.rank) : null
-                });
-            });
-
-            const grid = document.getElementById('decades-grid');
-            grid.innerHTML = '';
-
-            Object.keys(decadasMap).sort().forEach(decada => {
-                const items = decadasMap[decada];
-                const validScores = items.filter(i => i.score !== null);
-                if (validScores.length === 0) return;
-
-                const mediaScore = (validScores.reduce((acc, curr) => acc + curr.score, 0) / validScores.length).toFixed(2);
-                const validRanks = items.filter(i => i.rank !== null && !isNaN(i.rank));
-                const mediaRank = validRanks.length > 0 ? (validRanks.reduce((acc, curr) => acc + curr.rank, 0) / validRanks.length).toFixed(1) + 'º' : 'N/A';
-
-                const bestScoreDec = validScores.reduce((max, curr) => curr.score > max.score ? curr : max, validScores[0]);
-                const bestRankDec = validRanks.length > 0 ? validRanks.reduce((min, curr) => curr.rank < min.rank ? curr : min, validRanks[0]) : null;
-                const top10Count = validRanks.filter(i => i.rank <= 10).length;
-
-                const box = document.createElement('div');
-                box.className = 'stat-box';
-                box.innerHTML = `
-                    <h5>${decada}</h5>
-                    <div class="decade-main-stats">
-                        <div class="decade-stat-col"><span>Nota</span><strong>${mediaScore}</strong></div>
-                        <div class="decade-stat-col"><span>Pos</span><strong>${mediaRank}</strong></div>
-                    </div>
-                    <div class="decade-details">
-                        <div><span>Mejor Nota:</span> <strong>${bestScoreDec.score.toFixed(2)} (${bestScoreDec.year})</strong></div>
-                        <div><span>Mejor Pos:</span> <strong>${bestRankDec ? bestRankDec.rank + 'º (' + bestRankDec.year + ')' : 'N/A'}</strong></div>
-                        <div><span>Top 10:</span> <strong>${top10Count}</strong></div>
-                    </div>
-                `;
-                grid.appendChild(box);
-            });
-        }
-
-        function construirTabla(scoresData, festivalMap, yearlyMap, countryRankMap, countryName) {
-            const tbody = document.getElementById('scores-table-body');
-            tbody.innerHTML = '';
-
-            scoresData.forEach(item => {
-                const year = item.year;
-                const festInfo = festivalMap[year] || {};
-                const isWithdrawn = festInfo.withdrawn === true;
-
-                const tr = document.createElement('tr');
-                const tdYear = document.createElement('td');
-                tdYear.innerHTML = isWithdrawn ? `${year} <span class="withdrawn-text">(//)</span>` : year;
-                tr.appendChild(tdYear);
-
-                const tdScore = document.createElement('td');
-                const input = document.createElement('input');
-                input.type = 'number';
-                input.step = '0.1';
-                input.className = 'input-score';
-                input.value = item.score !== null ? item.score : '';
-                input.addEventListener('change', async () => {
-                    await actualizarNotaEnSupabase(countryName, year, input.value);
-                });
-                tdScore.appendChild(input);
-                tr.appendChild(tdScore);
-
-                const tdYearlyRank = document.createElement('td');
-                const posYearly = yearlyMap[year]?.rank;
-                tdYearlyRank.innerHTML = posYearly ? `<span class="badge-readonly">${posYearly}º</span>` : '-';
-                tr.appendChild(tdYearlyRank);
-
-                const tdCountryRank = document.createElement('td');
-                const posCountry = countryRankMap[year];
-                tdCountryRank.innerHTML = posCountry ? `<span class="badge-readonly">${posCountry}º</span>` : '-';
-                tr.appendChild(tdCountryRank);
-
-                tbody.appendChild(tr);
-            });
-        }
-
-        async function actualizarNotaEnSupabase(country, year, nuevaNota) {
-            try {
-                const valorNota = nuevaNota === '' ? null : parseFloat(nuevaNota);
-                await fetch(`${SUPABASE_URL}/scores?country=eq.${encodeURIComponent(country)}&year=eq.${year}`, {
-                    method: 'PATCH',
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-                    body: JSON.stringify({ score: valorNota })
-                });
-            } catch (err) { console.error(err); }
-        }
-
-        function renderizarGraficaPais(validScores, countryName) {
-            const ctx = document.getElementById('chartCountryScores').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: validScores.map(i => i.year),
-                    datasets: [{
-                        label: `Notas ${countryName}`,
-                        data: validScores.map(i => i.score),
-                        borderColor: '#00d2ff',
-                        backgroundColor: 'rgba(0, 210, 255, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.2,
-                        pointRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { min: 0, max: 100, grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 11 } } },
-                        x: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 11 } } }
-                    }
-                }
-            });
-        }
-
-        cargarDatosPais();
-    </script>
-
-</body>
-</html>
-    <title>Detalle de País - VisionChart</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            max-width: 1000px; 
-            margin: 30px auto; 
-            padding: 0 20px; 
-            background: #0d1117; 
-            color: #c9d1d9; 
-        }
-        h1 { color: #00d2ff; margin: 0; font-size: 24px; }
-        .card { 
-            background: #161b22; 
-            padding: 20px; 
-            border-radius: 8px; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.6); 
-            margin-bottom: 20px; 
-            border: 1px solid #30363d;
-        }
-        .back-link { display: inline-block; margin-bottom: 12px; color: #00d2ff; text-decoration: none; font-weight: bold; font-size: 14px; }
-        .back-link:hover { text-decoration: underline; }
-
-        /* Tarjeta Única Compacta */
-        .unified-header {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
-            border-bottom: 1px solid #30363d;
-            padding-bottom: 15px;
-            margin-bottom: 15px;
-        }
-        .country-flag {
-            width: 110px;
-            height: 70px;
-            object-fit: cover;
-            border-radius: 4px;
-            border: 1px solid #30363d;
-            background: #21262d;
-            display: none;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-        }
-        .header-info { flex: 1; }
-        
-        .metrics-row {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-top: 10px;
-        }
-        .metric-pill {
-            background: #0d1117;
-            border: 1px solid #30363d;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 12px;
-            color: #8b949e;
-        }
-        .metric-pill strong {
-            color: #00d2ff;
-            font-size: 14px;
-            margin-left: 4px;
-        }
-
-        /* Bloque Global y Décadas Integrado */
-        .section-title {
-            color: #e6edf3;
-            font-size: 14px;
-            font-weight: bold;
-            margin: 0 0 10px 0;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .global-records-inline {
-            display: flex;
-            gap: 20px;
-            background: #0d1117;
-            padding: 10px 15px;
-            border-radius: 6px;
-            border: 1px solid #30363d;
-            margin-bottom: 15px;
-            font-size: 13px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .global-records-inline span { color: #8b949e; }
-        .global-records-inline strong { color: #e6edf3; margin-left: 5px; }
-        .global-records-inline strong span { color: #00d2ff; font-weight: normal; }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 12px;
-        }
-        .stat-box {
-            background: #0d1117;
-            border: 1px solid #30363d;
-            padding: 12px;
-            border-radius: 6px;
-        }
-        .stat-box h5 {
-            margin: 0 0 8px 0;
-            color: #00d2ff;
-            font-size: 13px;
-            border-bottom: 1px solid #21262d;
-            padding-bottom: 4px;
-        }
-        .decade-main-stats {
-            display: flex;
-            justify-content: space-between;
-            background: #161b22;
-            padding: 6px 10px;
-            border-radius: 4px;
-            margin-bottom: 8px;
-            text-align: center;
-            border: 1px solid #21262d;
-        }
-        .decade-stat-col { flex: 1; }
-        .decade-stat-col:first-child { border-right: 1px solid #30363d; }
-        .decade-stat-col span { display: block; font-size: 10px; color: #8b949e; }
-        .decade-stat-col strong { font-size: 15px; color: #00d2ff; }
-        
-        .decade-details {
-            font-size: 12px;
-            color: #8b949e;
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-        }
-        .decade-details div { display: flex; justify-content: space-between; }
-        .decade-details span strong { color: #e6edf3; }
-
-        /* Tabla y Gráfica Compactas */
-        .table-container { overflow-x: auto; margin-top: 10px; }
-        table { width: 100%; border-collapse: collapse; background: #0d1117; border-radius: 6px; overflow: hidden; border: 1px solid #30363d; font-size: 13px; }
-        th, td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #21262d; }
-        th { background: #21262d; color: #e6edf3; font-weight: bold; }
-        tr:hover { background: rgba(255, 255, 255, 0.02); }
-        .input-score { background: #161b22; border: 1px solid #30363d; color: #e6edf3; padding: 4px 8px; border-radius: 4px; width: 60px; text-align: center; font-size: 13px; }
-        .input-score:focus { border-color: #00d2ff; outline: none; }
-        .badge-readonly { background: #21262d; color: #c9d1d9; padding: 3px 6px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-        .withdrawn-text { color: #f85149; font-weight: bold; font-style: italic; }
-
-        .chart-container { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; position: relative; height: 300px; margin-top: 10px; }
-    </style>
-</head>
-<body>
-
-    <a href="index.html" class="back-link">← Volver al Inicio</a>
-
-    <!-- Tarjeta Única Unificada -->
-    <div class="card">
-        <div class="unified-header">
-            <img id="country-flag" class="country-flag" alt="Bandera">
-            <div class="header-info">
-                <h1 id="country-title">Cargando...</h1>
-                <div class="metrics-row">
-                    <div class="metric-pill">Nota General: <strong id="hero-avg-score">-</strong></div>
-                    <div class="metric-pill">Pos. Media: <strong id="hero-avg-rank">-</strong></div>
-                    <div class="metric-pill">Participaciones: <strong id="hero-participations">-</strong></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Récords Globales en línea -->
-        <div class="global-records-inline" id="global-records-box" style="display: none;">
-            <div><span>🏆 Mejor Nota Histórica:</span> <strong id="history-best-score">-</strong></div>
-            <div style="margin-left: auto;"><span>🥇 Mejor Posición Histórica:</span> <strong id="history-best-rank">-</strong></div>
-        </div>
-
-        <!-- Rendimiento por Décadas -->
-        <h4 class="section-title">📊 Rendimiento por Décadas</h4>
-        <div class="stats-grid" id="decades-grid"></div>
-    </div>
-
-    <!-- Tabla Anual -->
-    <div class="card">
-        <h4 class="section-title">📋 Historial Anual</h4>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Año</th>
-                        <th>Notas (Editable)</th>
-                        <th>Posición Anual</th>
-                        <th>Posición del País</th>
-                    </tr>
-                </thead>
-                <tbody id="scores-table-body"></tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- Gráfica -->
-    <div class="card">
-        <h4 class="section-title">📈 Progreso de Notas</h4>
-        <div class="chart-container">
-            <canvas id="chartCountryScores"></canvas>
-        </div>
-    </div>
-    
-    <script>
-        const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1';
-        const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const rawCountryName = urlParams.get('nombre');
-
-        async function cargarDatosPais() {
-            const titleEl = document.getElementById('country-title');
-            if (!rawCountryName) { titleEl.textContent = "País no especificado"; return; }
-
-            const decodedCountry = decodeURIComponent(rawCountryName);
-            titleEl.textContent = decodedCountry;
-            
-            // Usar codigos ISO o nombre alternativo para la API de banderas si es necesario, o nombre directo
-            cargarBandera(decodedCountry);
-
-            try {
-                const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY };
-                const [resScores, resFestival, resYearly, resCountryRank] = await Promise.all([
-                    fetch(`${SUPABASE_URL}/scores?country=eq.${encodeURIComponent(decodedCountry)}&order=year.asc`, { headers }),
-                    fetch(`${SUPABASE_URL}/festival?order=year.asc`, { headers }),
-                    fetch(`${SUPABASE_URL}/yearly_rankings?country=eq.${encodeURIComponent(decodedCountry)}`, { headers }),
-                    fetch(`${SUPABASE_URL}/country_rankings?country=eq.${encodeURIComponent(decodedCountry)}`, { headers })
-                ]);
-
-                if (!resScores.ok || !resFestival.ok) throw new Error('Error BBDD');
-
-                const scoresData = await resScores.json();
-                const festivalData = await resFestival.json();
-                const yearlyData = await resYearly.json();
-                const countryRankData = await resCountryRank.json();
-
-                if (scoresData.length === 0) return;
-
-                const festivalMap = {};
-                festivalData.forEach(f => { festivalMap[f.year] = f; });
-                const yearlyMap = {};
-                yearlyData.forEach(y => { yearlyMap[y.year] = y; });
-                const countryRankMap = {};
-                countryRankData.forEach(c => { countryRankMap[c.year] = c.position; });
-
-                procesarEstadisticasCabecera(scoresData, yearlyData, festivalMap);
-                construirTabla(scoresData, festivalMap, yearlyMap, countryRankMap, decodedCountry);
-                renderizarGraficaPais(scoresData.filter(i => i.score !== null), decodedCountry);
-
-            } catch (error) { console.error(error); }
-        }
-
-        async function cargarBandera(countryName) {
-            try {
-                // Mapeo rápido por si el nombre difiere en la API de banderas (ej: UK, Czechia)
-                let queryName = countryName;
-                if (countryName === "Czech Republic") queryName = "Czechia";
-                
-                const res = await fetch(`https://restcountries.com/v3.1/name/${encodeURIComponent(queryName)}?fullText=false`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && data.length > 0 && data[0].flags?.svg) {
-                        const flagImg = document.getElementById('country-flag');
-                        flagImg.src = data[0].flags.svg;
-                        flagImg.style.display = 'block';
-                    }
-                }
-            } catch (e) { console.log('Bandera no encontrada:', e); }
         }
 
         function procesarEstadisticasCabecera(scoresData, yearlyData, festivalMap) {
