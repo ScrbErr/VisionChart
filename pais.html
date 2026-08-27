@@ -124,6 +124,7 @@
             font-size: 13px;
             border-bottom: 1px solid #21262d;
             padding-bottom: 4px;
+            text-align: center; /* Títulos de décadas centrados */
         }
         .decade-main-stats {
             display: flex;
@@ -240,7 +241,6 @@
         const urlParams = new URLSearchParams(window.location.search);
         const rawCountryName = urlParams.get('nombre');
 
-        // Mapeo actualizado incluyendo Canadá ('ca')
         const countryCodes = {
             "Albania": "al", "Germany": "de", "Andorra": "ad", "Armenia": "am", "Australia": "au",
             "Austria": "at", "Azerbaijan": "az", "Belgium": "be", "Belarus": "by", "Bosnia and Herzegovina": "ba",
@@ -327,7 +327,6 @@
             });
             document.getElementById('hero-participations').textContent = participaciones;
 
-            // Récords Globales
             let mejorNota = scoresValidos.reduce((max, curr) => Number(curr.score) > Number(max.score) ? curr : max, scoresValidos[0]);
             let mejorRank = ranksValidos.length > 0 ? ranksValidos.reduce((min, curr) => Number(curr.rank) < Number(min.rank) ? curr : min, ranksValidos[0]) : null;
 
@@ -335,7 +334,6 @@
             document.getElementById('history-best-rank').innerHTML = mejorRank ? `${mejorRank.rank}º <span>(${mejorRank.year})</span>` : 'N/A';
             document.getElementById('global-records-box').style.display = 'flex';
 
-            // Décadas
             const decadasMap = {};
             scoresData.forEach(item => {
                 const decadaKey = Math.floor(item.year / 10) * 10 + 's';
