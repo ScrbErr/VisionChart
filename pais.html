@@ -8,7 +8,7 @@
     <style>
         body { 
             font-family: Arial, sans-serif; 
-            max-width: 950px; 
+            max-width: 1000px; 
             margin: 40px auto; 
             padding: 0 20px; 
             background: #0d1117; 
@@ -27,6 +27,48 @@
         .back-link { display: inline-block; margin-bottom: 15px; color: #00d2ff; text-decoration: none; font-weight: bold; }
         .back-link:hover { text-decoration: underline; }
         #status { font-weight: bold; margin-bottom: 15px; }
+
+        /* Cabecera / Presentación del País */
+        .hero-container {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        .country-flag {
+            width: 120px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid #30363d;
+            background: #21262d;
+        }
+        .hero-info {
+            flex: 1;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .stat-box {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            padding: 10px 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-box span {
+            display: block;
+            font-size: 12px;
+            color: #8b949e;
+            margin-bottom: 4px;
+        }
+        .stat-box strong {
+            font-size: 18px;
+            color: #00d2ff;
+        }
 
         /* Estilos de la tabla de datos */
         .table-container {
@@ -70,13 +112,15 @@
         }
         .badge-readonly {
             background: #21262d;
-            color: #8b949e;
+            color: #c9d1d9;
             padding: 4px 8px;
             border-radius: 4px;
             font-size: 13px;
+            font-weight: bold;
         }
-        .withdrawn-row {
-            color: #8b949e;
+        .withdrawn-text {
+            color: #f85149;
+            font-weight: bold;
             font-style: italic;
         }
 
@@ -95,30 +139,45 @@
 
     <a href="festival.html" class="back-link">← Volver al Histórico</a>
 
-    <!-- Cabecera / Presentación -->
+    <!-- Sección de Presentación (Hero) -->
     <div class="card">
-        <h1 id="country-title">Cargando país...</h1>
-        <p id="country-subtitle">Ficha técnica y detalle histórico.</p>
-        <div id="status">Conectando con la base de datos...</div>
+        <div class="hero-container">
+            <img id="country-flag" class="country-flag" src="" alt="Bandera del país" style="display: none;">
+            <div class="hero-info">
+                <h1 id="country-title">Cargando país...</h1>
+                <p id="country-subtitle">Ficha técnica y detalle histórico de rendimiento.</p>
+            </div>
+        </div>
+        
+        <div id="status" style="margin-top: 15px;">Conectando con la base de datos...</div>
+
+        <!-- Métricas generales y por décadas -->
+        <div class="stats-grid" id="stats-grid" style="display: none;">
+            <div class="stat-box">
+                <span>Media General</span>
+                <strong id="stat-general-avg">-</strong>
+            </div>
+            <!-- Las décadas se inyectarán dinámicamente aquí -->
+        </div>
     </div>
 
-    <!-- Tabla Editable -->
+    <!-- Tabla Editable con las 4 columnas requeridas -->
     <div class="card">
-        <h2>📊 Historial y Notas Anuales</h2>
-        <p style="font-size: 13px; margin-bottom: 15px;">Modifica las notas directamente y pulsa Enter o sal de la celda para guardar los cambios en tiempo real.</p>
+        <h2>📊 Historial y Registros Anuales</h2>
+        <p style="font-size: 13px; margin-bottom: 15px;">Modifica las notas de la segunda columna directamente; se guardarán de forma automática en la base de datos.</p>
         
         <div class="table-container">
             <table>
                 <thead>
                     <tr>
                         <th>Año</th>
-                        <th>Nota (Editable)</th>
+                        <th>Notas (Editable)</th>
                         <th>Posición Anual</th>
                         <th>Posición del País</th>
                     </tr>
                 </thead>
                 <tbody id="scores-table-body">
-                    <!-- Los datos se inyectarán dinámicamente -->
+                    <!-- Inyección dinámica -->
                 </tbody>
             </table>
         </div>
@@ -126,7 +185,7 @@
 
     <!-- Sección de Gráfica -->
     <div class="card">
-        <h2>📈 Evolución Gráfica</h2>
+        <h2>📈 Progreso de Notas</h2>
         <div class="chart-container">
             <canvas id="chartCountryScores"></canvas>
         </div>
@@ -136,7 +195,7 @@
         const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1';
         const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
 
-        // 1. Capturar y decodificar correctamente el parámetro 'nombre' de la URL
+        // Capturar parámetro 'nombre' de la URL
         const urlParams = new URLSearchParams(window.location.search);
         const rawCountryName = urlParams.get('nombre');
 
@@ -155,15 +214,18 @@
             const decodedCountry = decodeURIComponent(rawCountryName);
             
             titleEl.textContent = `🎵 ${decodedCountry}`;
-            subtitleEl.textContent = `Ficha de rendimiento y registros históricos para ${decodedCountry}.`;
+            subtitleEl.textContent = `Análisis detallado de rendimiento para ${decodedCountry}.`;
+
+            // Intentar cargar la bandera mediante una API pública de países por nombre
+            cargarBandera(decodedCountry);
 
             try {
-                // 2. Consultar simultáneamente scores, festival (para saber retiradas), yearly_rankings y country_rankings
                 const headers = { 
                     'apikey': SUPABASE_ANON_KEY, 
                     'Authorization': 'Bearer ' + SUPABASE_ANON_KEY 
                 };
 
+                // Consultar todas las tablas necesarias en paralelo
                 const [resScores, resFestival, resYearly, resCountryRank] = await Promise.all([
                     fetch(`${SUPABASE_URL}/scores?country=eq.${encodeURIComponent(decodedCountry)}&order=year.asc`, { headers }),
                     fetch(`${SUPABASE_URL}/festival?order=year.asc`, { headers }),
@@ -189,7 +251,7 @@
                 statusDiv.textContent = `✅ Datos cargados correctamente (${scoresData.length} registros).`;
                 statusDiv.style.color = '#3fb950';
 
-                // Mapear datos auxiliares para un acceso rápido por año
+                // Mapear datos auxiliares para acceso rápido
                 const festivalMap = {};
                 festivalData.forEach(f => { festivalMap[f.year] = f; });
 
@@ -199,12 +261,16 @@
                 const countryRankMap = {};
                 countryRankData.forEach(c => { countryRankMap[c.year] = c.position; });
 
-                // Construir la tabla interactiva
+                // Calcular estadísticas (Media general y por décadas)
+                calcularYMostrarEstadisticas(scoresData);
+
+                // Construir la tabla con las 4 columnas solicitadas
                 construirTabla(scoresData, festivalMap, yearlyMap, countryRankMap, decodedCountry);
 
-                // Preparar datos para la gráfica
-                const years = scoresData.map(item => item.year);
-                const scores = scoresData.map(item => item.score);
+                // Preparar datos para la gráfica de notas
+                const validScores = scoresData.filter(item => item.score !== null);
+                const years = validScores.map(item => item.year);
+                const scores = validScores.map(item => item.score);
                 renderizarGraficaPais(years, scores, decodedCountry);
 
             } catch (error) {
@@ -212,6 +278,68 @@
                 statusDiv.style.color = '#f85149';
                 console.error('Detalle:', error);
             }
+        }
+
+        async function cargarBandera(countryName) {
+            try {
+                // Usamos la API de restcountries para buscar la bandera
+                const res = await fetch(`https://restcountries.com/v3.1/name/${encodeURIComponent(countryName)}?fullText=false`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.length > 0 && data[0].flags && data[0].flags.svg) {
+                        const flagImg = document.getElementById('country-flag');
+                        flagImg.src = data[0].flags.svg;
+                        flagImg.style.display = 'block';
+                    }
+                }
+            } catch (e) {
+                console.log('No se pudo cargar la bandera automáticamente:', e);
+            }
+        }
+
+        function calcularYMostrarEstadisticas(scoresData) {
+            const statsGrid = document.getElementById('stats-grid');
+            const generalAvgEl = document.getElementById('stat-general-avg');
+            
+            const scoresValidos = scoresData.filter(i => i.score !== null && !isNaN(i.score));
+            if (scoresValidos.length === 0) return;
+
+            // Media general
+            const sumaTotal = scoresValidos.reduce((acc, curr) => acc + Number(curr.score), 0);
+            const mediaGeneral = (sumaTotal / scoresValidos.length).toFixed(2);
+            generalAvgEl.textContent = mediaGeneral;
+
+            // Agrupar por décadas (ej: 2000, 2001 -> década de 2000)
+            const decadas = {};
+            scoresValidos.forEach(item => {
+                const decadaKey = Math.floor(item.year / 10) * 10 + 's';
+                if (!decadas[decadaKey]) decadas[decadaKey] = [];
+                decadas[decadaKey].push(Number(item.score));
+            });
+
+            // Limpiar cajas de décadas anteriores si existieran y dejar la general
+            statsGrid.innerHTML = `
+                <div class="stat-box">
+                    <span>Media General</span>
+                    <strong>${mediaGeneral}</strong>
+                </div>
+            `;
+
+            // Añadir cajas dinámicas por década ordenadas
+            Object.keys(decadas).sort().forEach(decada => {
+                const arr = decadas[decada];
+                const mediaDecada = (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(2);
+                
+                const box = document.createElement('div');
+                box.className = 'stat-box';
+                box.innerHTML = `
+                    <span>Década ${decada}</span>
+                    <strong>${mediaDecada}</strong>
+                `;
+                statsGrid.appendChild(box);
+            });
+
+            statsGrid.style.display = 'grid';
         }
 
         function construirTabla(scoresData, festivalMap, yearlyMap, countryRankMap, countryName) {
@@ -225,41 +353,39 @@
 
                 const tr = document.createElement('tr');
 
-                // 1. Columna Año (si está retirado muestra //)
+                // Columna 1: Años (si está withdrawn se ve como //)
                 const tdYear = document.createElement('td');
                 if (isWithdrawn) {
-                    tdYear.innerHTML = `<span class="withdrawn-row">${year} (//)</span>`;
+                    tdYear.innerHTML = `${year} <span class="withdrawn-text">(//)</span>`;
                 } else {
                     tdYear.textContent = year;
                 }
                 tr.appendChild(tdYear);
 
-                // 2. Columna Nota (Editable)
+                // Columna 2: Notas (Editable)
                 const tdScore = document.createElement('td');
                 const input = document.createElement('input');
                 input.type = 'number';
+                input.step = '0.1';
                 input.className = 'input-score';
                 input.value = item.score !== null ? item.score : '';
                 
-                // Guardar al perder el foco o pulsar Enter
                 input.addEventListener('change', async () => {
                     await actualizarNotaEnSupabase(countryName, year, input.value);
                 });
                 input.addEventListener('keypress', async (e) => {
-                    if (e.key === 'Enter') {
-                        input.blur();
-                    }
+                    if (e.key === 'Enter') input.blur();
                 });
                 tdScore.appendChild(input);
                 tr.appendChild(tdScore);
 
-                // 3. Columna Posición Anual (No editable)
+                // Columna 3: Posición anual (NO editable, de yearly_rankings)
                 const tdYearlyRank = document.createElement('td');
                 const posYearly = yearlyMap[year];
                 tdYearlyRank.innerHTML = posYearly !== undefined ? `<span class="badge-readonly">${posYearly}º</span>` : '<span style="color:#8b949e">-</span>';
                 tr.appendChild(tdYearlyRank);
 
-                // 4. Columna Posición del País
+                // Columna 4: Posición de los años del país (de country_rankings)
                 const tdCountryRank = document.createElement('td');
                 const posCountry = countryRankMap[year];
                 tdCountryRank.innerHTML = posCountry !== undefined ? `<span class="badge-readonly">${posCountry}º</span>` : '<span style="color:#8b949e">-</span>';
@@ -302,7 +428,7 @@
                 data: {
                     labels: years,
                     datasets: [{
-                        label: `Puntuación de ${countryName}`,
+                        label: `Progreso de Puntuación - ${countryName}`,
                         data: scores,
                         borderColor: '#00d2ff',
                         backgroundColor: 'rgba(0, 210, 255, 0.15)',
@@ -319,7 +445,7 @@
                     plugins: { 
                         title: { 
                             display: true, 
-                            text: `Evolución de Puntuaciones - ${countryName}`, 
+                            text: `Evolución Histórica de Notas`, 
                             color: '#c9d1d9', 
                             font: { size: 16 } 
                         } 
