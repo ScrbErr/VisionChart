@@ -8,7 +8,7 @@
     <style>
         body { 
             font-family: Arial, sans-serif; 
-            max-width: 900px; 
+            max-width: 950px; 
             margin: 40px auto; 
             padding: 0 20px; 
             background: #0d1117; 
@@ -28,6 +28,58 @@
         .back-link:hover { text-decoration: underline; }
         #status { font-weight: bold; margin-bottom: 15px; }
 
+        /* Estilos de la tabla de datos */
+        .table-container {
+            overflow-x: auto;
+            margin-top: 15px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #0d1117;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #30363d;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: center;
+            border-bottom: 1px solid #21262d;
+        }
+        th {
+            background: #21262d;
+            color: #e6edf3;
+            font-weight: bold;
+        }
+        tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .input-score {
+            background: #161b22;
+            border: 1px solid #30363d;
+            color: #e6edf3;
+            padding: 6px 10px;
+            border-radius: 4px;
+            width: 70px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .input-score:focus {
+            border-color: #00d2ff;
+            outline: none;
+        }
+        .badge-readonly {
+            background: #21262d;
+            color: #8b949e;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .withdrawn-row {
+            color: #8b949e;
+            font-style: italic;
+        }
+
         .chart-container {
             background: #0d1117;
             border: 1px solid #30363d;
@@ -43,12 +95,38 @@
 
     <a href="festival.html" class="back-link">← Volver al Histórico</a>
 
+    <!-- Cabecera / Presentación -->
     <div class="card">
         <h1 id="country-title">Cargando país...</h1>
-        <p id="country-subtitle">Histórico de puntuaciones individuales.</p>
-        
+        <p id="country-subtitle">Ficha técnica y detalle histórico.</p>
         <div id="status">Conectando con la base de datos...</div>
+    </div>
 
+    <!-- Tabla Editable -->
+    <div class="card">
+        <h2>📊 Historial y Notas Anuales</h2>
+        <p style="font-size: 13px; margin-bottom: 15px;">Modifica las notas directamente y pulsa Enter o sal de la celda para guardar los cambios en tiempo real.</p>
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Año</th>
+                        <th>Nota (Editable)</th>
+                        <th>Posición Anual</th>
+                        <th>Posición del País</th>
+                    </tr>
+                </thead>
+                <tbody id="scores-table-body">
+                    <!-- Los datos se inyectarán dinámicamente -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Sección de Gráfica -->
+    <div class="card">
+        <h2>📈 Evolución Gráfica</h2>
         <div class="chart-container">
             <canvas id="chartCountryScores"></canvas>
         </div>
@@ -74,26 +152,33 @@
                 return;
             }
 
-            // Decodificamos el nombre por si trae caracteres especiales o símbolos (&, tildes, etc.)
             const decodedCountry = decodeURIComponent(rawCountryName);
             
             titleEl.textContent = `🎵 ${decodedCountry}`;
-            subtitleEl.textContent = `Evolución histórica de puntuaciones para ${decodedCountry}.`;
+            subtitleEl.textContent = `Ficha de rendimiento y registros históricos para ${decodedCountry}.`;
 
             try {
-                // 2. Consultar las puntuaciones de este país ordenadas por año usando el nombre exacto
-                const resScores = await fetch(`${SUPABASE_URL}/scores?country=eq.${encodeURIComponent(decodedCountry)}&order=year.asc`, {
-                    headers: { 
-                        'apikey': SUPABASE_ANON_KEY, 
-                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
-                    }
-                });
+                // 2. Consultar simultáneamente scores, festival (para saber retiradas), yearly_rankings y country_rankings
+                const headers = { 
+                    'apikey': SUPABASE_ANON_KEY, 
+                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY 
+                };
 
-                if (!resScores.ok) {
-                    throw new Error('Error al conectar con la base de datos de puntuaciones.');
+                const [resScores, resFestival, resYearly, resCountryRank] = await Promise.all([
+                    fetch(`${SUPABASE_URL}/scores?country=eq.${encodeURIComponent(decodedCountry)}&order=year.asc`, { headers }),
+                    fetch(`${SUPABASE_URL}/festival?order=year.asc`, { headers }),
+                    fetch(`${SUPABASE_URL}/yearly_rankings?country=eq.${encodeURIComponent(decodedCountry)}`, { headers }),
+                    fetch(`${SUPABASE_URL}/country_rankings?country=eq.${encodeURIComponent(decodedCountry)}`, { headers })
+                ]);
+
+                if (!resScores.ok || !resFestival.ok) {
+                    throw new Error('Error al conectar con la base de datos.');
                 }
 
                 const scoresData = await resScores.json();
+                const festivalData = await resFestival.json();
+                const yearlyData = await resYearly.json();
+                const countryRankData = await resCountryRank.json();
 
                 if (scoresData.length === 0) {
                     statusDiv.textContent = `⚠️ No se encontraron registros de puntuación para ${decodedCountry}.`;
@@ -104,16 +189,108 @@
                 statusDiv.textContent = `✅ Datos cargados correctamente (${scoresData.length} registros).`;
                 statusDiv.style.color = '#3fb950';
 
-                // 3. Preparar datos para la gráfica
+                // Mapear datos auxiliares para un acceso rápido por año
+                const festivalMap = {};
+                festivalData.forEach(f => { festivalMap[f.year] = f; });
+
+                const yearlyMap = {};
+                yearlyData.forEach(y => { yearlyMap[y.year] = y.position; });
+
+                const countryRankMap = {};
+                countryRankData.forEach(c => { countryRankMap[c.year] = c.position; });
+
+                // Construir la tabla interactiva
+                construirTabla(scoresData, festivalMap, yearlyMap, countryRankMap, decodedCountry);
+
+                // Preparar datos para la gráfica
                 const years = scoresData.map(item => item.year);
                 const scores = scoresData.map(item => item.score);
-
                 renderizarGraficaPais(years, scores, decodedCountry);
 
             } catch (error) {
                 statusDiv.textContent = '❌ Error: ' + error.message;
                 statusDiv.style.color = '#f85149';
                 console.error('Detalle:', error);
+            }
+        }
+
+        function construirTabla(scoresData, festivalMap, yearlyMap, countryRankMap, countryName) {
+            const tbody = document.getElementById('scores-table-body');
+            tbody.innerHTML = '';
+
+            scoresData.forEach(item => {
+                const year = item.year;
+                const festInfo = festivalMap[year] || {};
+                const isWithdrawn = festInfo.withdrawn === true;
+
+                const tr = document.createElement('tr');
+
+                // 1. Columna Año (si está retirado muestra //)
+                const tdYear = document.createElement('td');
+                if (isWithdrawn) {
+                    tdYear.innerHTML = `<span class="withdrawn-row">${year} (//)</span>`;
+                } else {
+                    tdYear.textContent = year;
+                }
+                tr.appendChild(tdYear);
+
+                // 2. Columna Nota (Editable)
+                const tdScore = document.createElement('td');
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.className = 'input-score';
+                input.value = item.score !== null ? item.score : '';
+                
+                // Guardar al perder el foco o pulsar Enter
+                input.addEventListener('change', async () => {
+                    await actualizarNotaEnSupabase(countryName, year, input.value);
+                });
+                input.addEventListener('keypress', async (e) => {
+                    if (e.key === 'Enter') {
+                        input.blur();
+                    }
+                });
+                tdScore.appendChild(input);
+                tr.appendChild(tdScore);
+
+                // 3. Columna Posición Anual (No editable)
+                const tdYearlyRank = document.createElement('td');
+                const posYearly = yearlyMap[year];
+                tdYearlyRank.innerHTML = posYearly !== undefined ? `<span class="badge-readonly">${posYearly}º</span>` : '<span style="color:#8b949e">-</span>';
+                tr.appendChild(tdYearlyRank);
+
+                // 4. Columna Posición del País
+                const tdCountryRank = document.createElement('td');
+                const posCountry = countryRankMap[year];
+                tdCountryRank.innerHTML = posCountry !== undefined ? `<span class="badge-readonly">${posCountry}º</span>` : '<span style="color:#8b949e">-</span>';
+                tr.appendChild(tdCountryRank);
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function actualizarNotaEnSupabase(country, year, nuevaNota) {
+            try {
+                const valorNota = nuevaNota === '' ? null : parseFloat(nuevaNota);
+                
+                const response = await fetch(`${SUPABASE_URL}/scores?country=eq.${encodeURIComponent(country)}&year=eq.${year}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify({ score: valorNota })
+                });
+
+                if (!response.ok) {
+                    throw new Error('No se pudo guardar el cambio en Supabase.');
+                }
+                console.log(`Nota actualizada para ${country} en ${year}: ${valorNota}`);
+            } catch (err) {
+                console.error(err);
+                alert('Error al guardar la nota: ' + err.message);
             }
         }
 
