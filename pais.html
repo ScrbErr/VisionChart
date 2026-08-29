@@ -168,7 +168,6 @@
         th:hover { background: #30363d; }
         tr:hover { background: rgba(255, 255, 255, 0.02); }
 
-        /* Estilo para años en negrita */
         .year-bold { font-weight: bold; color: #e6edf3; }
         
         .input-score, .input-country-rank { 
@@ -183,21 +182,15 @@
         }
         .input-score:focus, .input-country-rank:focus { border-color: #00d2ff; outline: none; }
         
-        /* Ocultar flechas en inputs numéricos (Chrome, Safari, Edge, Opera) */
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { 
             -webkit-appearance: none; 
             margin: 0; 
         }
-        /* Ocultar flechas en Firefox */
-        input[type=number] {
-            -moz-appearance: textfield;
-        }
+        input[type=number] { -moz-appearance: textfield; }
 
-        /* Marquito indicador de modificación */
         .modified-cell { border: 2px solid #00d2ff !important; }
 
-        /* Cuadrado más grande y ajustado para Posición en el Festival */
         .badge-readonly { 
             padding: 5px 12px; 
             border-radius: 4px; 
@@ -206,9 +199,7 @@
             display: inline-block; 
             min-width: 45px; 
         }
-        .withdrawn-text { color: #f85149; font-weight: bold; font-style: italic; }
 
-        /* Botonera inferior centrada y estilizada idéntica a la imagen */
         .table-actions {
             display: flex;
             gap: 12px;
@@ -241,7 +232,6 @@
 
     <a href="index.html" class="back-link">← Volver al Inicio</a>
 
-    <!-- Tarjeta Principal Reorganizada -->
     <div class="card">
         <div class="unified-header">
             <div class="header-left">
@@ -277,7 +267,6 @@
         <div class="stats-grid" id="decades-grid"></div>
     </div>
 
-    <!-- Tabla Histórica Interactiva -->
     <div class="card">
         <h4 class="section-title">📋 Historial Anual</h4>
         <div class="table-container">
@@ -285,7 +274,7 @@
                 <thead>
                     <tr>
                         <th onclick="ordenarTabla('year')">Año ↕</th>
-                        <th onclick="ordenarTabla('score')">Notas (Editable) ↕</th>
+                        <th onclick="ordenarTabla('score')">Notas ↕</th>
                         <th onclick="ordenarTabla('yearlyRank')">Posición en el Festival ↕</th>
                         <th onclick="ordenarTabla('countryRank')">Ranking del país por año ↕</th>
                     </tr>
@@ -300,7 +289,6 @@
         </div>
     </div>
 
-    <!-- Gráfica -->
     <div class="card">
         <h4 class="section-title">📈 Progreso de Notas</h4>
         <div class="chart-container">
@@ -332,11 +320,12 @@
         let currentCountryName = '';
         let globalScoresData = [];
         let globalFestivalMap = {};
-        let globalYearlyMap = {};
-        let globalCountryRankMap = {};
+        let globalYearlyRankingsMap = {}; // Tabla yearly_rankings pura
+        let globalCountryRankMap = {};    // Tabla country_rankings independiente
         let originalState = {};
         let currentSortColumn = 'year';
         let currentSortAsc = true;
+        let globalFestivalListCache = [];
 
         async function cargarDatosPais() {
             const titleEl = document.getElementById('country-title');
@@ -367,20 +356,22 @@
 
                 globalFestivalMap = {};
                 festivalData.forEach(f => { globalFestivalMap[f.year] = f; });
+                globalFestivalListCache = festivalData;
                 
-                globalYearlyMap = {};
-                yearlyData.forEach(y => { globalYearlyMap[y.year] = y; });
+                // Mapeo estricto de yearly_rankings para Posición en el Festival
+                globalYearlyRankingsMap = {};
+                yearlyData.forEach(y => { globalYearlyRankingsMap[y.year] = y.rank; });
                 
+                // Mapeo independiente para Ranking del país por año
                 globalCountryRankMap = {};
                 countryRankData.forEach(c => { globalCountryRankMap[c.year] = c.position; });
 
-                // Mostrar fecha de última actualización (usando la fecha del registro más reciente o de scores)
                 if (globalScoresData.length > 0 && globalScoresData[0].date) {
                     document.getElementById('last-update-date').textContent = `Última actualización: ${globalScoresData[0].date}`;
                 }
 
                 guardarEstadoOriginal();
-                procesarEstadisticasCabecera(globalScoresData, yearlyData, globalFestivalMap, festivalData);
+                procesarEstadisticasCabecera(globalScoresData, yearlyData, globalFestivalMap);
                 renderizarTabla();
                 renderizarGraficaPais(globalScoresData.filter(i => i.score !== null), currentCountryName);
 
@@ -406,21 +397,15 @@
             }
         }
 
-        // Obtener el número real de participantes contando cuántos registros tienen withdrawn === false por año
-        function obtenerTotalParticipantesAnio(year, festivalDataList) {
-            // Filtrar todos los registros del festival que correspondan a ese año y tengan withdrawn === false
-            const delAnio = festivalDataList.filter(f => f.year === year && f.withdrawn === false);
+        function obtenerTotalParticipantesAnio(year) {
+            const delAnio = globalFestivalListCache.filter(f => f.year === year && f.withdrawn === false);
             if (delAnio.length > 0) return delAnio.length;
-            
-            // Alternativa si viene en formato mapa global por año agrupado
             let count = 0;
             Object.values(globalFestivalMap).forEach(f => {
                 if (f.year === year && f.withdrawn === false) count++;
             });
-            return count > 0 ? count : 30; // fallback por defecto si no encuentra
+            return count > 0 ? count : 30;
         }
-
-        let globalFestivalListCache = [];
 
         function obtenerClaseGradienteRanking(pos, totalParticipantes) {
             if (pos === null || isNaN(pos)) return 'pos-none';
@@ -437,8 +422,7 @@
             return 'pos-orange-std';
         }
 
-        function procesarEstadisticasCabecera(scoresData, yearlyData, festivalMap, festivalDataList) {
-            globalFestivalListCache = festivalDataList || [];
+        function procesarEstadisticasCabecera(scoresData, yearlyData, festivalMap) {
             const scoresValidos = scoresData.filter(i => i.score !== null && !isNaN(i.score));
             if (scoresValidos.length === 0) return;
 
@@ -522,13 +506,13 @@
                 return !fest || fest.withdrawn !== true;
             }).length;
 
-            // Ordenar datos asegurando que los años con withdrawn (//) o valores nulos/vacíos queden siempre abajo en cualquier filtro o ordenación
+            // Ordenamiento limpio asegurando que withdrawn (//) se vayan siempre a la cola sin condiciones complejas de vacíos
             let datosOrdenados = [...globalScoresData].sort((a, b) => {
                 const isWithdrawnA = globalFestivalMap[a.year]?.withdrawn === true ? 1 : 0;
                 const isWithdrawnB = globalFestivalMap[b.year]?.withdrawn === true ? 1 : 0;
 
                 if (isWithdrawnA !== isWithdrawnB) {
-                    return isWithdrawnA - isWithdrawnB; // Withdrawn siempre a la cola
+                    return isWithdrawnA - isWithdrawnB; 
                 }
 
                 let valA, valB;
@@ -541,8 +525,8 @@
                     if (valA === -999 && valB !== -999) return 1;
                     if (valB === -999 && valA !== -999) return -1;
                 } else if (currentSortColumn === 'yearlyRank') {
-                    valA = globalYearlyMap[a.year]?.rank !== undefined && globalYearlyMap[a.year]?.rank !== null ? Number(globalYearlyMap[a.year].rank) : 9999;
-                    valB = globalYearlyMap[b.year]?.rank !== undefined && globalYearlyMap[b.year]?.rank !== null ? Number(globalYearlyMap[b.year].rank) : 9999;
+                    valA = globalYearlyRankingsMap[a.year] !== undefined && globalYearlyRankingsMap[a.year] !== null ? Number(globalYearlyRankingsMap[a.year]) : 9999;
+                    valB = globalYearlyRankingsMap[b.year] !== undefined && globalYearlyRankingsMap[b.year] !== null ? Number(globalYearlyRankingsMap[b.year]) : 9999;
                     if (valA === 9999 && valB !== 9999) return 1;
                     if (valB === 9999 && valA !== 9999) return -1;
                 } else if (currentSortColumn === 'countryRank') {
@@ -562,49 +546,53 @@
 
                 const tr = document.createElement('tr');
                 
-                // Columna Año en Negrita
+                // 1. Columna Año en Negrita
                 const tdYear = document.createElement('td');
                 tdYear.className = 'year-bold';
                 tdYear.textContent = year;
                 tr.appendChild(tdYear);
 
-                // Columna Notas (Editable con validación 0-100, sin flechas y marquito si cambia)
+                // 2. Columna Notas (Si no participó o withdrawn, muestra // y no es editable)
                 const tdScore = document.createElement('td');
-                const inputScore = document.createElement('input');
-                inputScore.type = 'number';
-                inputScore.min = '0';
-                inputScore.max = '100';
-                inputScore.className = 'input-score';
-                inputScore.value = item.score !== null && item.score !== undefined ? item.score : '';
-                
-                if (originalState[year] && originalState[year].score !== item.score) {
-                    inputScore.classList.add('modified-cell');
-                }
-
-                inputScore.addEventListener('input', () => {
-                    let val = inputScore.value;
-                    if (val !== '') {
-                        let num = Number(val);
-                        if (num < 0) inputScore.value = 0;
-                        if (num > 100) inputScore.value = 100;
-                    }
-                });
-
-                inputScore.addEventListener('change', () => {
-                    item.score = inputScore.value === '' ? null : Number(inputScore.value);
+                if (isWithdrawn) {
+                    tdScore.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
+                } else {
+                    const inputScore = document.createElement('input');
+                    inputScore.type = 'number';
+                    inputScore.min = '0';
+                    inputScore.max = '100';
+                    inputScore.className = 'input-score';
+                    inputScore.value = item.score !== null && item.score !== undefined ? item.score : '';
+                    
                     if (originalState[year] && originalState[year].score !== item.score) {
                         inputScore.classList.add('modified-cell');
-                    } else {
-                        inputScore.classList.remove('modified-cell');
                     }
-                });
-                tdScore.appendChild(inputScore);
+
+                    inputScore.addEventListener('input', () => {
+                        let val = inputScore.value;
+                        if (val !== '') {
+                            let num = Number(val);
+                            if (num < 0) inputScore.value = 0;
+                            if (num > 100) inputScore.value = 100;
+                        }
+                    });
+
+                    inputScore.addEventListener('change', () => {
+                        item.score = inputScore.value === '' ? null : Number(inputScore.value);
+                        if (originalState[year] && originalState[year].score !== item.score) {
+                            inputScore.classList.add('modified-cell');
+                        } else {
+                            inputScore.classList.remove('modified-cell');
+                        }
+                    });
+                    tdScore.appendChild(inputScore);
+                }
                 tr.appendChild(tdScore);
 
-                // Columna Posición en el Festival (No editable, con cuadrado más grande alineado y gradiente correcto por año)
+                // 3. Columna Posición en el Festival (Tabla yearly_rankings pura, // si no participó)
                 const tdYearlyRank = document.createElement('td');
-                const posYearly = globalYearlyMap[year]?.rank;
-                const totalPartAnio = obtenerTotalParticipantesAnio(year, globalFestivalListCache);
+                const posYearly = globalYearlyRankingsMap[year];
+                const totalPartAnio = obtenerTotalParticipantesAnio(year);
 
                 if (isWithdrawn || posYearly === undefined || posYearly === null) {
                     tdYearlyRank.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
@@ -614,37 +602,39 @@
                 }
                 tr.appendChild(tdYearlyRank);
 
-                // Columna Ranking del país por año (Editable independientemente sin conflictos cruzados)
+                // 4. Columna Ranking del país por año (Independiente, // si no participó)
                 const tdCountryRank = document.createElement('td');
-                const inputCountryRank = document.createElement('input');
-                inputCountryRank.type = 'number';
-                inputCountryRank.min = '1';
-                inputCountryRank.max = participacionesValidas;
-                inputCountryRank.className = 'input-country-rank';
-                
-                const currentPos = globalCountryRankMap[year];
-                inputCountryRank.value = currentPos !== undefined && currentPos !== null ? currentPos : '';
-
-                if (originalState[year] && originalState[year].countryRank !== currentPos) {
-                    inputCountryRank.classList.add('modified-cell');
-                }
-
-                inputCountryRank.addEventListener('change', () => {
-                    let nuevaPos = parseInt(inputCountryRank.value);
-                    if (isNaN(nuevaPos)) return;
+                if (isWithdrawn) {
+                    tdCountryRank.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
+                } else {
+                    const inputCountryRank = document.createElement('input');
+                    inputCountryRank.type = 'number';
+                    inputCountryRank.min = '1';
+                    inputCountryRank.max = participacionesValidas;
+                    inputCountryRank.className = 'input-country-rank';
                     
-                    if (nuevaPos < 1) nuevaPos = 1;
-                    if (nuevaPos > participacionesValidas) nuevaPos = participacionesValidas;
+                    const currentPos = globalCountryRankMap[year];
+                    inputCountryRank.value = currentPos !== undefined && currentPos !== null ? currentPos : '';
 
-                    // Aislar la mutación exclusivamente al mapa de country ranks sin afectar yearly ranks
-                    globalCountryRankMap[year] = nuevaPos;
-                    renderizarTabla(); 
-                });
+                    if (originalState[year] && originalState[year].countryRank !== currentPos) {
+                        inputCountryRank.classList.add('modified-cell');
+                    }
 
-                const claseGradCountry = obtenerClaseGradienteRanking(currentPos, participacionesValidas);
-                inputCountryRank.classList.add(claseGradCountry);
+                    inputCountryRank.addEventListener('change', () => {
+                        let nuevaPos = parseInt(inputCountryRank.value);
+                        if (isNaN(nuevaPos)) return;
+                        
+                        if (nuevaPos < 1) nuevaPos = 1;
+                        if (nuevaPos > participacionesValidas) nuevaPos = participacionesValidas;
 
-                tdCountryRank.appendChild(inputCountryRank);
+                        globalCountryRankMap[year] = nuevaPos;
+                        renderizarTabla(); 
+                    });
+
+                    const claseGradCountry = obtenerClaseGradienteRanking(currentPos, participacionesValidas);
+                    inputCountryRank.classList.add(claseGradCountry);
+                    tdCountryRank.appendChild(inputCountryRank);
+                }
                 tr.appendChild(tdCountryRank);
 
                 tbody.appendChild(tr);
@@ -726,12 +716,13 @@
         }
 
         function exportarCSV() {
-            let csvContent = "data:text/csv;charset=utf-8,Año,Nota,Posicion en el Festival,Ranking Pais\n";
+            let csvContent = "data:text/csv;charset=utf-8,Año,Notas,Posicion en el Festival,Ranking Pais\n";
             globalScoresData.forEach(item => {
                 let year = item.year;
-                let score = item.score !== null && item.score !== undefined ? item.score : '';
-                let yearlyRank = globalYearlyMap[year]?.rank || '';
-                let countryRank = globalCountryRankMap[year] || '';
+                let isWithdrawn = globalFestivalMap[year]?.withdrawn === true;
+                let score = isWithdrawn ? "//" : (item.score !== null && item.score !== undefined ? item.score : '');
+                let yearlyRank = isWithdrawn || globalYearlyRankingsMap[year] === undefined ? "//" : globalYearlyRankingsMap[year];
+                let countryRank = isWithdrawn || globalCountryRankMap[year] === undefined ? "//" : globalCountryRankMap[year];
                 csvContent += `${year},${score},${yearlyRank},${countryRank}\n`;
             });
 
