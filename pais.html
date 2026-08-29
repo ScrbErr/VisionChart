@@ -330,6 +330,7 @@
                     <tr>
                         <th class="col-year" onclick="ordenarTabla('year')">
                             <span id="th-label-year">Año ↕</span>
+                            <span class="th-date" id="date-year">-</span>
                         </th>
                         <th class="col-score" onclick="ordenarTabla('score')">
                             <span id="th-label-score">Notas</span>
@@ -446,7 +447,6 @@
                 let rawYearlyData = await resYearly.json();
                 let rawCountryRankData = await resCountryRank.json();
 
-                // Filtrar para quedarnos únicamente con la entrada más reciente (por fecha) de cada año
                 let scoresMapObj = {};
                 rawScoresData.forEach(item => {
                     if (!scoresMapObj[item.year]) scoresMapObj[item.year] = item;
@@ -517,6 +517,11 @@
                 }
                 if (ultimaFechaCountry) {
                     document.getElementById('date-country').textContent = ultimaFechaCountry;
+                }
+
+                // Asignar la fecha más reciente de la tabla scores a la columna Año
+                if (ultimaFechaScore) {
+                    document.getElementById('date-year').textContent = ultimaFechaScore;
                 }
 
                 guardarEstadoOriginal();
