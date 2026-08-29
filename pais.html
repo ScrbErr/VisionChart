@@ -25,7 +25,6 @@
         .back-link { display: inline-block; margin-bottom: 12px; color: #00d2ff; text-decoration: none; font-weight: bold; font-size: 14px; }
         .back-link:hover { text-decoration: underline; }
 
-        /* Estructura Superior Optimizada */
         .unified-header {
             display: flex;
             align-items: center;
@@ -147,7 +146,6 @@
         .decade-details div { display: flex; justify-content: space-between; }
         .decade-details span strong { color: #e6edf3; }
 
-        /* Clases de colores según la posición (Gradiente Requerido) */
         .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; }
         .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; }
         .pos-3 { background-color: #e08a1e !important; color: #000 !important; font-weight: bold; }
@@ -160,7 +158,6 @@
         .pos-last         { background-color: #7f1d1d !important; color: #fff !important; font-weight: bold; }
         .pos-none         { background-color: #21262d !important; color: #8b949e !important; }
 
-        /* Tabla y Controles */
         .table-container { overflow-x: auto; margin-top: 10px; }
         table { width: 100%; border-collapse: collapse; background: #0d1117; border-radius: 6px; overflow: hidden; border: 1px solid #30363d; font-size: 13px; }
         th, td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #21262d; }
@@ -320,8 +317,8 @@
         let currentCountryName = '';
         let globalScoresData = [];
         let globalFestivalMap = {};
-        let globalYearlyRankingsMap = {}; // Tabla yearly_rankings pura
-        let globalCountryRankMap = {};    // Tabla country_rankings independiente
+        let globalYearlyRankingsMap = {}; 
+        let globalCountryRankMap = {};    
         let originalState = {};
         let currentSortColumn = 'year';
         let currentSortAsc = true;
@@ -358,13 +355,21 @@
                 festivalData.forEach(f => { globalFestivalMap[f.year] = f; });
                 globalFestivalListCache = festivalData;
                 
-                // Mapeo estricto de yearly_rankings para Posición en el Festival
+                // Mapeo estricto por país y año utilizando directamente yearly_rankings
                 globalYearlyRankingsMap = {};
-                yearlyData.forEach(y => { globalYearlyRankingsMap[y.year] = y.rank; });
+                yearlyData.forEach(y => { 
+                    if (y.country === currentCountryName) {
+                        globalYearlyRankingsMap[y.year] = y.rank; 
+                    }
+                });
                 
-                // Mapeo independiente para Ranking del país por año
+                // Mapeo estricto para country_rankings de forma independiente sin mezclar con yearly_rankings
                 globalCountryRankMap = {};
-                countryRankData.forEach(c => { globalCountryRankMap[c.year] = c.position; });
+                countryRankData.forEach(c => { 
+                    if (c.country === currentCountryName) {
+                        globalCountryRankMap[c.year] = c.position; 
+                    }
+                });
 
                 if (globalScoresData.length > 0 && globalScoresData[0].date) {
                     document.getElementById('last-update-date').textContent = `Última actualización: ${globalScoresData[0].date}`;
@@ -506,7 +511,7 @@
                 return !fest || fest.withdrawn !== true;
             }).length;
 
-            // Ordenamiento limpio asegurando que withdrawn (//) se vayan siempre a la cola sin condiciones complejas de vacíos
+            // Ordenamiento estricto por withdrawn (//) enviados abajo sin interferencia
             let datosOrdenados = [...globalScoresData].sort((a, b) => {
                 const isWithdrawnA = globalFestivalMap[a.year]?.withdrawn === true ? 1 : 0;
                 const isWithdrawnB = globalFestivalMap[b.year]?.withdrawn === true ? 1 : 0;
