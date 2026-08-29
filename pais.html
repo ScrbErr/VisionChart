@@ -149,7 +149,6 @@
         .decade-details div { display: flex; justify-content: space-between; }
         .decade-details span strong { color: #e6edf3; }
 
-        /* Colores exactos de la matriz solicitados */
         .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; }
         .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; }
         .pos-3 { background-color: #e08a1e !important; color: #000 !important; font-weight: bold; }
@@ -394,6 +393,24 @@
         let currentSortAsc = true;
         let totalAnosDisponiblesCount = 0;
         let totalParticipantesPorAnoMap = {};
+
+        // Función para obtener la fecha actual en España en formato yyyy-mm-dd
+        function obtenerFechaActualEspana() {
+            const formatter = new Intl.DateTimeFormat('es-ES', {
+                timeZone: 'Europe/Madrid',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+            const parts = formatter.formatToParts(new Date());
+            let year, month, day;
+            for (const p of parts) {
+                if (p.type === 'year') year = p.value;
+                if (p.type === 'month') month = p.value;
+                if (p.type === 'day') day = p.value;
+            }
+            return `${year}-${month}-${day}`;
+        }
 
         async function cargarDatosPais() {
             const titleEl = document.getElementById('country-title');
@@ -676,7 +693,6 @@
                         inputScore.classList.add('modified-cell');
                     }
 
-                    // Bloquear letras, símbolos negativos y restringir estrictamente de 0 a 100
                     inputScore.addEventListener('keydown', (e) => {
                         if (['e', 'E', '+', '-'].includes(e.key)) {
                             e.preventDefault();
@@ -685,7 +701,6 @@
 
                     inputScore.addEventListener('input', () => {
                         let val = inputScore.value;
-                        // Eliminar cualquier cosa que no sea número
                         val = val.replace(/[^0-9]/g, '');
                         if (val !== '') {
                             let num = Number(val);
@@ -753,26 +768,22 @@
                             return;
                         }
 
-                        // Limitar al rango de participaciones válidas
                         if (nuevaPos > participacionesValidas) nuevaPos = participacionesValidas;
                         if (nuevaPos < 1) nuevaPos = 1;
 
                         let oldPos = globalCountryRankMap[year];
                         if (oldPos === nuevaPos) return;
 
-                        // Desplazamiento de posiciones (shifting) según las reglas solicitadas
                         for (let otherYear in globalCountryRankMap) {
                             if (Number(otherYear) === Number(year)) continue;
                             let p = globalCountryRankMap[otherYear];
                             if (p === null || p === undefined) continue;
 
                             if (nuevaPos < oldPos) {
-                                // Moviendo hacia arriba (ej. de 5 a 1): los que estaban entre nuevaPos y oldPos - 1 bajan una posición (+1)
                                 if (p >= nuevaPos && p < oldPos) {
                                     globalCountryRankMap[otherYear] = p + 1;
                                 }
                             } else {
-                                // Moviendo hacia abajo (ej. de 8 a 16): los que estaban entre oldPos + 1 y nuevaPos suben una posición (-1)
                                 if (p > oldPos && p <= nuevaPos) {
                                     globalCountryRankMap[otherYear] = p - 1;
                                 }
@@ -812,6 +823,7 @@
                 };
 
                 let promesas = [];
+                let fechaActualEspana = obtenerFechaActualEspana();
 
                 globalScoresData.forEach(item => {
                     let year = item.year;
@@ -821,31 +833,41 @@
                     let originalScore = originalState[year]?.score;
                     let originalPosPais = originalState[year]?.countryRank;
 
+                    // Si la nota ha cambiado, INSERTAR una NUEVA tupla en la BBDD (POST)
                     if (nuevoScore !== originalScore) {
-                        let fechaEspanola = `${year}-05-15`;
                         promesas.push(
-                            fetch(`${SUPABASE_URL}/scores?country=eq.${encodeURIComponent(currentCountryName)}&year=eq.${year}`, {
-                                method: 'PATCH',
+                            fetch(`${SUPABASE_URL}/scores`, {
+                                method: 'POST',
                                 headers: headers,
-                                body: JSON.stringify({ score: nuevoScore, date: fechaEspanola })
+                                body: JSON.stringify({ 
+                                    country: currentCountryName, 
+                                    year: year, 
+                                    score: nuevoScore, 
+                                    date: fechaActualEspana 
+                                })
                             })
                         );
                     }
 
+                    // Si la posición de ranking ha cambiado, INSERTAR una NUEVA tupla en la BBDD (POST)
                     if (nuevaPosPais !== originalPosPais) {
-                        let fechaEspanola = `${year}-05-15`;
                         promesas.push(
-                            fetch(`${SUPABASE_URL}/country_rankings?country=eq.${encodeURIComponent(currentCountryName)}&year=eq.${year}`, {
-                                method: 'PATCH',
+                            fetch(`${SUPABASE_URL}/country_rankings`, {
+                                method: 'POST',
                                 headers: headers,
-                                body: JSON.stringify({ position: nuevaPosPais, date: fechaEspanola })
+                                body: JSON.stringify({ 
+                                    country: currentCountryName, 
+                                    year: year, 
+                                    position: nuevaPosPais, 
+                                    date: fechaActualEspana 
+                                })
                             })
                         );
                     }
                 });
 
                 await Promise.all(promesas);
-                alert('¡Cambios actualizados correctamente en la base de datos!');
+                alert('¡Nuevos registros guardados correctamente en la base de datos!');
                 guardarEstadoOriginal();
                 renderizarTabla();
             } catch (err) {
