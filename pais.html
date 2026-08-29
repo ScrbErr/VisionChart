@@ -176,32 +176,25 @@
             border: 1px solid #30363d; 
             font-size: 14px; 
         }
-        th, td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #21262d; }
+        td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #21262d; }
         
-        /* Títulos de columnas en celeste y con tamaño legible */
+        /* Encabezados más grandes, legibles y en color celeste */
         th { 
             background: #21262d; 
             color: #00d2ff; 
             font-weight: bold; 
             cursor: pointer; 
             user-select: none; 
-            font-size: 13px; 
+            font-size: 15px; 
+            padding: 12px 10px;
         }
         th:hover { background: #30363d; }
         tr:hover { background: rgba(255, 255, 255, 0.02); }
 
-        /* Ancho fijo optimizado y proporcionado */
-        .col-year { width: 22%; }
-        .col-score { width: 34%; }
-        .col-narrow {
-            width: 22%;
-            min-width: 90px;
-            white-space: nowrap;
-        }
+        .th-date { font-size: 12px; color: #8b949e; font-weight: normal; display: block; margin-top: 3px; }
 
-        .th-date { font-size: 11px; color: #8b949e; font-weight: normal; display: block; margin-top: 2px; }
-
-        .year-bold { font-weight: bold; color: #e6edf3; font-size: 15px; }
+        /* Años centrados, más grandes y en negrita */
+        .year-bold { font-weight: bold; color: #e6edf3; font-size: 16px; text-align: center; }
         
         .cell-wrapper-plain {
             display: inline-block;
@@ -241,11 +234,11 @@
         }
         input[type=number] { -moz-appearance: textfield; }
 
-        /* Estilo diferenciado para celdas editadas/modificadas independiente del color de fondo */
+        /* Estilo diferenciado para celdas editadas/modificadas con borde magenta fuerte y claro */
         .modified-cell { 
             outline: 3px solid #ff007f !important; 
-            box-shadow: 0 0 8px rgba(255, 0, 127, 0.8) !important;
-            background-color: rgba(255, 0, 127, 0.15) !important;
+            box-shadow: 0 0 10px rgba(255, 0, 127, 0.9) !important;
+            background-color: rgba(255, 0, 127, 0.2) !important;
         }
 
         .badge-readonly { 
@@ -294,7 +287,7 @@
             <div class="header-left">
                 <img id="country-flag" class="country-flag" alt="Bandera">
                 <div>
-                    <h1 id="country-title">Cargando...</h1>
+                    <h1 id="country-title" style="text-align: center;">Cargando...</h1>
                     <span id="last-update-date" style="font-size: 13px; color: #8b949e;">Última actualización general: -</span>
                 </div>
             </div>
@@ -325,23 +318,23 @@
     </div>
 
     <div class="card">
-        <h4 class="section-title section-title-center">📋 HISTORIAL ANUAL</h4>
+        <h4 class="section-title section-title-center" style="font-size: 18px; text-align: center;">HISTORIAL ANUAL</h4>
         <div class="table-container">
             <table id="historical-table">
                 <thead>
                     <tr>
-                        <th class="col-year" onclick="ordenarTabla('year')">
+                        <th onclick="ordenarTabla('year')">
                             <span id="th-label-year">Año ↕</span>
                         </th>
-                        <th class="col-score" onclick="ordenarTabla('score')">
+                        <th onclick="ordenarTabla('score')">
                             <span id="th-label-score">Notas</span>
                             <span class="th-date" id="date-score">-</span>
                         </th>
-                        <th class="col-narrow" onclick="ordenarTabla('yearlyRank')">
+                        <th onclick="ordenarTabla('yearlyRank')">
                             <span id="th-label-yearly">Posición por Festival</span>
                             <span class="th-date" id="date-yearly">-</span>
                         </th>
-                        <th class="col-narrow" onclick="ordenarTabla('countryRank')">
+                        <th onclick="ordenarTabla('countryRank')">
                             <span id="th-label-country">Ranking de los Años</span>
                             <span class="th-date" id="date-country">-</span>
                         </th>
@@ -508,21 +501,28 @@
             return globalRetiradosMap[year] && globalRetiradosMap[year][currentCountryName] === true;
         }
 
-        function obtenerClaseGradienteRanking(pos, totalParticipantesAnio) {
+        // Sistema de colores robusto basado estrictamente en el número total de participaciones (N)
+        function obtenerClaseGradienteRanking(pos, N) {
             if (pos === null || isNaN(pos)) return 'pos-none';
             if (pos === 1) return 'pos-1';
             if (pos === 2) return 'pos-2';
             if (pos === 3) return 'pos-3';
-            if (pos <= 5) return 'pos-green-dark';
-            if (pos <= 10) return 'pos-green-mid';
-            
-            let umbralVerdeClaro = Math.floor(totalParticipantesAnio * 0.6);
-            if (pos <= umbralVerdeClaro) return 'pos-green-light';
-            if (pos <= umbralVerdeClaro + 3) return 'pos-orange-light';
-            
-            if (pos === totalParticipantesAnio) return 'pos-last';
-            if (pos >= totalParticipantesAnio - 4) return 'pos-orange-strong';
-            return 'pos-orange-std';
+            if (pos >= 4 && pos <= 5) return 'pos-green-dark';
+            if (pos >= 6 && pos <= 10) return 'pos-green-mid';
+
+            // Última posición exacta
+            if (pos === N) return 'pos-last';
+
+            // Bottom 5 (últimos 5 excluyendo el absolute last si N>=35, o bottom 5 en general)
+            if (N >= 35) {
+                if (pos >= N - 4 && pos <= N - 1) return 'pos-orange-strong'; // Bottom 5 antes del último
+                if (pos >= N - 8 && pos <= N - 5) return 'pos-orange-std';    // Rango previo (ej. 31-34 en 40)
+                return 'pos-green-light'; // Rango intermedio 11 a N-9
+            } else {
+                // Para N < 35
+                if (pos >= N - 4 && pos <= N - 1) return 'pos-orange-strong';
+                return 'pos-green-light';
+            }
         }
 
         function procesarEstadisticasCabecera(scoresData, yearlyData) {
@@ -653,12 +653,11 @@
                 const tr = document.createElement('tr');
                 
                 const tdYear = document.createElement('td');
-                tdYear.className = 'year-bold col-year';
+                tdYear.className = 'year-bold';
                 tdYear.textContent = year;
                 tr.appendChild(tdYear);
 
                 const tdScore = document.createElement('td');
-                tdScore.className = 'col-score';
                 if (isWithdrawn) {
                     tdScore.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
                 } else {
@@ -700,7 +699,6 @@
                 tr.appendChild(tdScore);
 
                 const tdYearlyRank = document.createElement('td');
-                tdYearlyRank.className = 'col-narrow';
                 const posYearly = globalYearlyRankingsMap[year];
 
                 if (isWithdrawn || posYearly === undefined || posYearly === null) {
@@ -712,7 +710,6 @@
                 tr.appendChild(tdYearlyRank);
 
                 const tdCountryRank = document.createElement('td');
-                tdCountryRank.className = 'col-narrow';
                 if (isWithdrawn) {
                     tdCountryRank.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
                 } else {
@@ -744,14 +741,24 @@
                         if (nuevaPos > participacionesValidas) nuevaPos = participacionesValidas;
                         if (nuevaPos < 1) nuevaPos = 1;
 
+                        // Lógica de intercambio (Swap / Desplazamiento inteligente) en vez de duplicación
+                        // Buscamos si ya hay otro año con exactamente esta nueva posición
+                        let anoAfectado = null;
                         for (let otherYear in globalCountryRankMap) {
-                            if (Number(otherYear) !== Number(year) && globalCountryRankMap[otherYear] === nuevaPos) {
-                                globalCountryRankMap[otherYear] = originalState[otherYear]?.countryRank ?? null;
+                            if (Number(otherYear) !== Number(year) && Number(globalCountryRankMap[otherYear]) === nuevaPos) {
+                                anoAfectado = otherYear;
                                 break;
                             }
                         }
 
+                        let viejaPosActual = globalCountryRankMap[year];
                         globalCountryRankMap[year] = nuevaPos;
+
+                        if (anoAfectado) {
+                            // Le asignamos al año afectado la posición antigua que tenía este año
+                            globalCountryRankMap[anoAfectado] = viejaPosActual;
+                        }
+
                         renderizarTabla(); 
                     });
 
@@ -839,14 +846,16 @@
         }
 
         function exportarCSV() {
-            let csvContent = "data:text/csv;charset=utf-8,Ano,Notas,Posicion en el Festival,Ranking de los Anos\n";
+            let csvContent = "data:text/csv;charset=utf-8,Ano,Notas,Posicion en el Festival,Ranking de los Anos
+";
             globalScoresData.forEach(item => {
                 let year = item.year;
                 let isWithdrawn = esPaisRetirado(year);
                 let score = isWithdrawn ? "//" : (item.score !== null && item.score !== undefined ? item.score : '');
                 let yearlyRank = isWithdrawn || globalYearlyRankingsMap[year] === undefined ? "//" : globalYearlyRankingsMap[year];
                 let countryRank = isWithdrawn || globalCountryRankMap[year] === undefined ? "//" : globalCountryRankMap[year];
-                csvContent += `${year},${score},${yearlyRank},${countryRank}\n`;
+                csvContent += `${year},${score},${yearlyRank},${countryRank}
+`;
             });
 
             let encodedUri = encodeURI(csvContent);
