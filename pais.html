@@ -179,7 +179,6 @@
         }
         th, td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #21262d; }
         
-        /* Títulos de columnas en celeste, más grandes y legibles */
         th { 
             background: #21262d; 
             color: #00d2ff; 
@@ -677,12 +676,24 @@
                         inputScore.classList.add('modified-cell');
                     }
 
+                    // Bloquear letras, símbolos negativos y restringir estrictamente de 0 a 100
+                    inputScore.addEventListener('keydown', (e) => {
+                        if (['e', 'E', '+', '-'].includes(e.key)) {
+                            e.preventDefault();
+                        }
+                    });
+
                     inputScore.addEventListener('input', () => {
                         let val = inputScore.value;
+                        // Eliminar cualquier cosa que no sea número
+                        val = val.replace(/[^0-9]/g, '');
                         if (val !== '') {
                             let num = Number(val);
-                            if (num < 0) inputScore.value = 0;
-                            if (num > 100) inputScore.value = 100;
+                            if (num < 0) num = 0;
+                            if (num > 100) num = 100;
+                            inputScore.value = num;
+                        } else {
+                            inputScore.value = '';
                         }
                     });
 
@@ -741,25 +752,34 @@
                             renderizarTabla();
                             return;
                         }
-                        
+
+                        // Limitar al rango de participaciones válidas
                         if (nuevaPos > participacionesValidas) nuevaPos = participacionesValidas;
                         if (nuevaPos < 1) nuevaPos = 1;
 
-                        let anoConMismaPos = null;
+                        let oldPos = globalCountryRankMap[year];
+                        if (oldPos === nuevaPos) return;
+
+                        // Desplazamiento de posiciones (shifting) según las reglas solicitadas
                         for (let otherYear in globalCountryRankMap) {
-                            if (Number(otherYear) !== Number(year) && globalCountryRankMap[otherYear] === nuevaPos) {
-                                anoConMismaPos = otherYear;
-                                break;
+                            if (Number(otherYear) === Number(year)) continue;
+                            let p = globalCountryRankMap[otherYear];
+                            if (p === null || p === undefined) continue;
+
+                            if (nuevaPos < oldPos) {
+                                // Moviendo hacia arriba (ej. de 5 a 1): los que estaban entre nuevaPos y oldPos - 1 bajan una posición (+1)
+                                if (p >= nuevaPos && p < oldPos) {
+                                    globalCountryRankMap[otherYear] = p + 1;
+                                }
+                            } else {
+                                // Moviendo hacia abajo (ej. de 8 a 16): los que estaban entre oldPos + 1 y nuevaPos suben una posición (-1)
+                                if (p > oldPos && p <= nuevaPos) {
+                                    globalCountryRankMap[otherYear] = p - 1;
+                                }
                             }
                         }
 
-                        let posicionAnterior = globalCountryRankMap[year];
                         globalCountryRankMap[year] = nuevaPos;
-
-                        if (anoConMismaPos && posicionAnterior !== null && posicionAnterior !== undefined) {
-                            globalCountryRankMap[anoConMismaPos] = posicionAnterior;
-                        }
-
                         renderizarTabla(); 
                     });
 
