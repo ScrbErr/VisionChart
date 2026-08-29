@@ -316,13 +316,13 @@
 
         let currentCountryName = '';
         let globalScoresData = [];
-        let globalFestivalMap = {};
+        let globalRetiradosMap = {}; // Patrón idéntico a tu matriz para withdrawn
         let globalYearlyRankingsMap = {}; 
         let globalCountryRankMap = {};    
         let originalState = {};
         let currentSortColumn = 'year';
         let currentSortAsc = true;
-        let globalFestivalListCache = [];
+        let totalAnosDisponiblesCount = 0;
 
         async function cargarDatosPais() {
             const titleEl = document.getElementById('country-title');
@@ -337,7 +337,7 @@
                 const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY };
                 const [resScores, resFestival, resYearly, resCountryRank] = await Promise.all([
                     fetch(`${SUPABASE_URL}/scores?country=eq.${encodeURIComponent(currentCountryName)}&order=year.asc`, { headers }),
-                    fetch(`${SUPABASE_URL}/festival?order=year.asc`, { headers }),
+                    fetch(`${SUPABASE_URL}/festival?select=country,year,withdrawn`, { headers }),
                     fetch(`${SUPABASE_URL}/yearly_rankings?country=eq.${encodeURIComponent(currentCountryName)}`, { headers }),
                     fetch(`${SUPABASE_URL}/country_rankings?country=eq.${encodeURIComponent(currentCountryName)}`, { headers })
                 ]);
@@ -351,9 +351,19 @@
 
                 if (globalScoresData.length === 0) return;
 
-                globalFestivalMap = {};
-                festivalData.forEach(f => { globalFestivalMap[f.year] = f; });
-                globalFestivalListCache = festivalData;
+                // Mapeo idéntico de withdrawn al que tienes en la matriz funcional
+                globalRetiradosMap = {};
+                let anosSet = new Set();
+                festivalData.forEach(f => {
+                    if (f.country && f.year) {
+                        anosSet.add(f.year);
+                        if (!globalRetiradosMap[f.year]) globalRetiradosMap[f.year] = {};
+                        if (f.withdrawn === true || f.withdrawn === 'true') {
+                            globalRetiradosMap[f.year][f.country] = true;
+                        }
+                    }
+                });
+                totalAnosDisponiblesCount = anosSet.size;
                 
                 globalYearlyRankingsMap = {};
                 yearlyData.forEach(y => { 
@@ -374,7 +384,7 @@
                 }
 
                 guardarEstadoOriginal();
-                procesarEstadisticasCabecera(globalScoresData, yearlyData, globalFestivalMap);
+                procesarEstadisticasCabecera(globalScoresData, yearlyData);
                 renderizarTabla();
                 renderizarGraficaPais(globalScoresData.filter(i => i.score !== null), currentCountryName);
 
@@ -400,22 +410,9 @@
             }
         }
 
-        function obtenerTotalParticipantesAnio(year) {
-            const delAnio = globalFestivalListCache.filter(f => f.year === year && f.withdrawn === false);
-            if (delAnio.length > 0) return delAnio.length;
-            let count = 0;
-            Object.values(globalFestivalMap).forEach(f => {
-                if (f.year === year && f.withdrawn === false) count++;
-            });
-            return count > 0 ? count : 30;
-        }
-
-        // Corrección definitiva de withdrawn: La tabla festival tiene el listado de festivales por año. 
-        // Comprobamos explícitamente si el registro del festival para ese año marca withdrawn como true.
+        // Validación idéntica a tu matriz para comprobar si el país está retirado ese año
         function esPaisRetirado(year) {
-            const fest = globalFestivalMap[year];
-            if (!fest) return false; 
-            return fest.withdrawn === true;
+            return globalRetiradosMap[year] && globalRetiradosMap[year][currentCountryName] === true;
         }
 
         function obtenerClaseGradienteRanking(pos, totalParticipantes) {
@@ -433,7 +430,7 @@
             return 'pos-orange-std';
         }
 
-        function procesarEstadisticasCabecera(scoresData, yearlyData, festivalMap) {
+        function procesarEstadisticasCabecera(scoresData, yearlyData) {
             const scoresValidos = scoresData.filter(i => i.score !== null && !isNaN(i.score));
             if (scoresValidos.length === 0) return;
 
@@ -511,7 +508,6 @@
             const tbody = document.getElementById('scores-table-body');
             tbody.innerHTML = '';
 
-            // Total de participaciones válidas para acotar los números del input de ranking del país
             const participacionesValidas = globalScoresData.filter(i => !esPaisRetirado(i.year)).length;
 
             let datosOrdenados = [...globalScoresData].sort((a, b) => {
@@ -552,13 +548,11 @@
 
                 const tr = document.createElement('tr');
                 
-                // 1. Columna Año en Negrita
                 const tdYear = document.createElement('td');
                 tdYear.className = 'year-bold';
                 tdYear.textContent = year;
                 tr.appendChild(tdYear);
 
-                // 2. Columna Notas (Si no participó, muestra // y no es editable)
                 const tdScore = document.createElement('td');
                 if (isWithdrawn) {
                     tdScore.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
@@ -595,10 +589,9 @@
                 }
                 tr.appendChild(tdScore);
 
-                // 3. Columna Posición en el Festival (Tabla yearly_rankings pura, // si no participó)
                 const tdYearlyRank = document.createElement('td');
                 const posYearly = globalYearlyRankingsMap[year];
-                const totalPartAnio = obtenerTotalParticipantesAnio(year);
+                const totalPartAnio = totalAnosDisponiblesCount > 0 ? totalAnosDisponiblesCount : 30;
 
                 if (isWithdrawn || posYearly === undefined || posYearly === null) {
                     tdYearlyRank.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
@@ -608,7 +601,6 @@
                 }
                 tr.appendChild(tdYearlyRank);
 
-                // 4. Columna Ranking del país por año (Restricción estricta de valores y unicidad)
                 const tdCountryRank = document.createElement('td');
                 if (isWithdrawn) {
                     tdCountryRank.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
@@ -634,7 +626,6 @@
                             return;
                         }
                         
-                        // Si introducen un número mayor que el total de participaciones, se fija al máximo exacto
                         if (nuevaPos > participacionesValidas) {
                             nuevaPos = participacionesValidas;
                         }
@@ -642,7 +633,6 @@
                             nuevaPos = 1;
                         }
 
-                        // Evitar duplicados: Si otro año ya tiene exactamente este número asignado, liberamos el conflicto
                         for (let otherYear in globalCountryRankMap) {
                             if (Number(otherYear) !== Number(year) && globalCountryRankMap[otherYear] === nuevaPos) {
                                 globalCountryRankMap[otherYear] = currentPos !== undefined && currentPos !== null ? currentPos : null;
