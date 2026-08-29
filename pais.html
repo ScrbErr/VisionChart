@@ -383,7 +383,6 @@
             "Luxembourg": "lu", "Monaco": "mc", "Yugoslavia": "yu", "Canada": "ca"
         };
 
-        // Lista ordenada alfabéticamente de todos los países para obtener su índice exacto de 2 dígitos (ej: '01', '10', etc.)
         const sortedAllCountries = Object.keys(countryCodes).sort();
 
         let currentCountryName = '';
@@ -397,7 +396,6 @@
         let totalAnosDisponiblesCount = 0;
         let totalParticipantesPorAnoMap = {};
 
-        // Función para obtener la fecha actual en España en formato yyyy-mm-dd
         function obtenerFechaActualEspana() {
             const formatter = new Intl.DateTimeFormat('es-ES', {
                 timeZone: 'Europe/Madrid',
@@ -415,15 +413,11 @@
             return `${year}-${month}-${day}`;
         }
 
-        // Función para generar el ID personalizado (últimos 3 dígitos del año + número de orden alfabético del país de 2 dígitos)
         function generarCustomId(year, countryName) {
             const yearStr = String(year);
             const last3Year = yearStr.slice(-3).padStart(3, '0');
-            
-            // Buscar índice en orden alfabético (1-based)
             const index = sortedAllCountries.indexOf(countryName);
             const countryNum = index !== -1 ? String(index + 1).padStart(2, '0') : '01';
-            
             return last3Year + countryNum;
         }
 
@@ -439,18 +433,35 @@
             try {
                 const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY };
                 const [resScores, resFestival, resYearly, resCountryRank] = await Promise.all([
-                    fetch(`${SUPABASE_URL}/scores?country=eq.${encodeURIComponent(currentCountryName)}&order=year.asc`, { headers }),
+                    fetch(`${SUPABASE_URL}/scores?country=eq.${encodeURIComponent(currentCountryName)}&order=date.desc`, { headers }),
                     fetch(`${SUPABASE_URL}/festival?select=country,year,withdrawn`, { headers }),
-                    fetch(`${SUPABASE_URL}/yearly_rankings?country=eq.${encodeURIComponent(currentCountryName)}`, { headers }),
-                    fetch(`${SUPABASE_URL}/country_rankings?country=eq.${encodeURIComponent(currentCountryName)}`, { headers })
+                    fetch(`${SUPABASE_URL}/yearly_rankings?country=eq.${encodeURIComponent(currentCountryName)}&order=date.desc`, { headers }),
+                    fetch(`${SUPABASE_URL}/country_rankings?country=eq.${encodeURIComponent(currentCountryName)}&order=date.desc`, { headers })
                 ]);
 
                 if (!resScores.ok || !resFestival.ok) throw new Error('Error BBDD');
 
-                globalScoresData = await resScores.json();
+                let rawScoresData = await resScores.json();
                 const festivalData = await resFestival.json();
-                const yearlyData = await resYearly.json();
-                const countryRankData = await resCountryRank.json();
+                let rawYearlyData = await resYearly.json();
+                let rawCountryRankData = await resCountryRank.json();
+
+                // Filtrar para quedarnos únicamente con la entrada más reciente (por fecha) de cada año
+                let scoresMapObj = {};
+                rawScoresData.forEach(item => {
+                    if (!scoresMapObj[item.year]) scoresMapObj[item.year] = item;
+                });
+                globalScoresData = Object.values(scoresMapObj).sort((a, b) => a.year - b.year);
+
+                let yearlyMapObj = {};
+                rawYearlyData.forEach(item => {
+                    if (!yearlyMapObj[item.year]) yearlyMapObj[item.year] = item;
+                });
+
+                let countryRankMapObj = {};
+                rawCountryRankData.forEach(item => {
+                    if (!countryRankMapObj[item.year]) countryRankMapObj[item.year] = item;
+                });
 
                 if (globalScoresData.length === 0) return;
 
@@ -475,7 +486,7 @@
                 
                 globalYearlyRankingsMap = {};
                 let ultimaFechaYearly = null;
-                yearlyData.forEach(y => { 
+                Object.values(yearlyMapObj).forEach(y => { 
                     if (y.country === currentCountryName) {
                         globalYearlyRankingsMap[y.year] = y.rank; 
                         if (y.date) ultimaFechaYearly = y.date;
@@ -484,7 +495,7 @@
                 
                 globalCountryRankMap = {};
                 let ultimaFechaCountry = null;
-                countryRankData.forEach(c => { 
+                Object.values(countryRankMapObj).forEach(c => { 
                     if (c.country === currentCountryName) {
                         globalCountryRankMap[c.year] = c.position; 
                         if (c.date) ultimaFechaCountry = c.date;
@@ -509,7 +520,7 @@
                 }
 
                 guardarEstadoOriginal();
-                procesarEstadisticasCabecera(globalScoresData, yearlyData);
+                procesarEstadisticasCabecera(globalScoresData, Object.values(yearlyMapObj));
                 renderizarTabla();
                 renderizarGraficaPais(globalScoresData.filter(i => i.score !== null), currentCountryName);
 
@@ -848,10 +859,8 @@
                     let originalScore = originalState[year]?.score;
                     let originalPosPais = originalState[year]?.countryRank;
 
-                    // Generar el ID personalizado con el formato requerido (ej: 02601)
                     let customId = generarCustomId(year, currentCountryName);
 
-                    // Si la nota ha cambiado, insertar nueva tupla en la tabla 'scores' incluyendo id y country
                     if (nuevoScore !== originalScore) {
                         promesas.push(
                             fetch(`${SUPABASE_URL}/scores`, {
@@ -868,7 +877,6 @@
                         );
                     }
 
-                    // Si la posición de ranking ha cambiado, insertar nueva tupla en la tabla 'country_rankings' incluyendo id y country
                     if (nuevaPosPais !== originalPosPais) {
                         promesas.push(
                             fetch(`${SUPABASE_URL}/country_rankings`, {
