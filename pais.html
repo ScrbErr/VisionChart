@@ -149,7 +149,7 @@
         .decade-details div { display: flex; justify-content: space-between; }
         .decade-details span strong { color: #e6edf3; }
 
-        /* Colores exactos de la matriz */
+        /* Colores exactos de la matriz solicitados */
         .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; }
         .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; }
         .pos-3 { background-color: #e08a1e !important; color: #000 !important; font-weight: bold; }
@@ -159,7 +159,8 @@
         .pos-orange-light { background-color: #db6d28 !important; color: #fff !important; }
         .pos-orange-std   { background-color: #bc4c00 !important; color: #fff !important; }
         .pos-orange-strong{ background-color: #9e2a2b !important; color: #fff !important; }
-        .pos-last         { background-color: #7f1d1d !important; color: #fff !important; font-weight: bold; }
+        .pos-bottom-5     { background-color: #8b1e1e !important; color: #fff !important; font-weight: bold; }
+        .pos-last         { background-color: #581c87 !important; color: #fff !important; font-weight: bold; }
         .pos-none         { background-color: #21262d !important; color: #8b949e !important; }
 
         .table-container { 
@@ -176,9 +177,9 @@
             border: 1px solid #30363d; 
             font-size: 14px; 
         }
-        td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #21262d; }
+        th, td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #21262d; }
         
-        /* Encabezados más grandes, legibles y en color celeste */
+        /* Títulos de columnas en celeste, más grandes y legibles */
         th { 
             background: #21262d; 
             color: #00d2ff; 
@@ -191,10 +192,17 @@
         th:hover { background: #30363d; }
         tr:hover { background: rgba(255, 255, 255, 0.02); }
 
-        .th-date { font-size: 12px; color: #8b949e; font-weight: normal; display: block; margin-top: 3px; }
+        .col-year { width: 22%; }
+        .col-score { width: 34%; }
+        .col-narrow {
+            width: 22%;
+            min-width: 90px;
+            white-space: nowrap;
+        }
 
-        /* Años centrados, más grandes y en negrita */
-        .year-bold { font-weight: bold; color: #e6edf3; font-size: 16px; text-align: center; }
+        .th-date { font-size: 11px; color: #8b949e; font-weight: normal; display: block; margin-top: 3px; }
+
+        .year-bold { font-weight: bold; color: #e6edf3; font-size: 15px; }
         
         .cell-wrapper-plain {
             display: inline-block;
@@ -234,10 +242,10 @@
         }
         input[type=number] { -moz-appearance: textfield; }
 
-        /* Estilo diferenciado para celdas editadas/modificadas con borde magenta fuerte y claro */
+        /* Estilo diferenciado para celdas editadas sin usar azul celeste */
         .modified-cell { 
             outline: 3px solid #ff007f !important; 
-            box-shadow: 0 0 10px rgba(255, 0, 127, 0.9) !important;
+            box-shadow: 0 0 8px rgba(255, 0, 127, 0.8) !important;
             background-color: rgba(255, 0, 127, 0.2) !important;
         }
 
@@ -287,7 +295,7 @@
             <div class="header-left">
                 <img id="country-flag" class="country-flag" alt="Bandera">
                 <div>
-                    <h1 id="country-title" style="text-align: center;">Cargando...</h1>
+                    <h1 id="country-title">Cargando...</h1>
                     <span id="last-update-date" style="font-size: 13px; color: #8b949e;">Última actualización general: -</span>
                 </div>
             </div>
@@ -318,23 +326,23 @@
     </div>
 
     <div class="card">
-        <h4 class="section-title section-title-center" style="font-size: 18px; text-align: center;">HISTORIAL ANUAL</h4>
+        <h4 class="section-title section-title-center">HISTORIAL ANUAL</h4>
         <div class="table-container">
             <table id="historical-table">
                 <thead>
                     <tr>
-                        <th onclick="ordenarTabla('year')">
+                        <th class="col-year" onclick="ordenarTabla('year')">
                             <span id="th-label-year">Año ↕</span>
                         </th>
-                        <th onclick="ordenarTabla('score')">
+                        <th class="col-score" onclick="ordenarTabla('score')">
                             <span id="th-label-score">Notas</span>
                             <span class="th-date" id="date-score">-</span>
                         </th>
-                        <th onclick="ordenarTabla('yearlyRank')">
+                        <th class="col-narrow" onclick="ordenarTabla('yearlyRank')">
                             <span id="th-label-yearly">Posición por Festival</span>
                             <span class="th-date" id="date-yearly">-</span>
                         </th>
-                        <th onclick="ordenarTabla('countryRank')">
+                        <th class="col-narrow" onclick="ordenarTabla('countryRank')">
                             <span id="th-label-country">Ranking de los Años</span>
                             <span class="th-date" id="date-country">-</span>
                         </th>
@@ -501,28 +509,26 @@
             return globalRetiradosMap[year] && globalRetiradosMap[year][currentCountryName] === true;
         }
 
-        // Sistema de colores robusto basado estrictamente en el número total de participaciones (N)
-        function obtenerClaseGradienteRanking(pos, N) {
+        // Lógica precisa de colores basada en los rangos y total de participaciones (ej: 40, 35, etc.)
+        function obtenerClaseGradienteRanking(pos, totalParticipantesAnio) {
             if (pos === null || isNaN(pos)) return 'pos-none';
             if (pos === 1) return 'pos-1';
             if (pos === 2) return 'pos-2';
             if (pos === 3) return 'pos-3';
             if (pos >= 4 && pos <= 5) return 'pos-green-dark';
             if (pos >= 6 && pos <= 10) return 'pos-green-mid';
+            if (pos >= 11 && pos <= 26) return 'pos-green-light';
+            if (pos >= 27 && pos <= 30) return 'pos-orange-light';
 
-            // Última posición exacta
-            if (pos === N) return 'pos-last';
+            // Si hay bottom 5 y último definidos dinámicamente según el total
+            let bottom5Inicio = totalParticipantesAnio - 4; // ej: 36 para 40, 31 para 35
+            if (pos === totalParticipantesAnio) return 'pos-last';
+            if (pos >= bottom5Inicio && pos < totalParticipantesAnio) return 'pos-bottom-5';
+            
+            // Si está entre 31 y bottom5Inicio (ej: 31-35)
+            if (pos >= 31 && pos < bottom5Inicio) return 'pos-orange-strong';
 
-            // Bottom 5 (últimos 5 excluyendo el absolute last si N>=35, o bottom 5 en general)
-            if (N >= 35) {
-                if (pos >= N - 4 && pos <= N - 1) return 'pos-orange-strong'; // Bottom 5 antes del último
-                if (pos >= N - 8 && pos <= N - 5) return 'pos-orange-std';    // Rango previo (ej. 31-34 en 40)
-                return 'pos-green-light'; // Rango intermedio 11 a N-9
-            } else {
-                // Para N < 35
-                if (pos >= N - 4 && pos <= N - 1) return 'pos-orange-strong';
-                return 'pos-green-light';
-            }
+            return 'pos-orange-std';
         }
 
         function procesarEstadisticasCabecera(scoresData, yearlyData) {
@@ -648,16 +654,17 @@
             datosOrdenados.forEach(item => {
                 const year = item.year;
                 const isWithdrawn = esPaisRetirado(year);
-                const totalPartAnio = totalParticipantesPorAnoMap[year] || 25;
+                const totalPartAnio = totalParticipantesPorAnoMap[year] || participacionesValidas;
 
                 const tr = document.createElement('tr');
                 
                 const tdYear = document.createElement('td');
-                tdYear.className = 'year-bold';
+                tdYear.className = 'year-bold col-year';
                 tdYear.textContent = year;
                 tr.appendChild(tdYear);
 
                 const tdScore = document.createElement('td');
+                tdScore.className = 'col-score';
                 if (isWithdrawn) {
                     tdScore.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
                 } else {
@@ -699,6 +706,7 @@
                 tr.appendChild(tdScore);
 
                 const tdYearlyRank = document.createElement('td');
+                tdYearlyRank.className = 'col-narrow';
                 const posYearly = globalYearlyRankingsMap[year];
 
                 if (isWithdrawn || posYearly === undefined || posYearly === null) {
@@ -710,6 +718,7 @@
                 tr.appendChild(tdYearlyRank);
 
                 const tdCountryRank = document.createElement('td');
+                tdCountryRank.className = 'col-narrow';
                 if (isWithdrawn) {
                     tdCountryRank.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
                 } else {
@@ -730,6 +739,7 @@
                         inputCountryRank.classList.add('modified-cell');
                     }
 
+                    // CORRECCIÓN CLAVE DE INTERCAMBIO (SWAP) PARA EVITAR DUPLICADOS Y CAMBIAR DE POSICIÓN CORRECTAMENTE
                     inputCountryRank.addEventListener('change', () => {
                         let nuevaPos = parseInt(inputCountryRank.value);
                         if (isNaN(nuevaPos)) {
@@ -741,22 +751,21 @@
                         if (nuevaPos > participacionesValidas) nuevaPos = participacionesValidas;
                         if (nuevaPos < 1) nuevaPos = 1;
 
-                        // Lógica de intercambio (Swap / Desplazamiento inteligente) en vez de duplicación
-                        // Buscamos si ya hay otro año con exactamente esta nueva posición
-                        let anoAfectado = null;
+                        // Buscar si otro año ya tiene exactamente esta nueva posición
+                        let anoConMismaPos = null;
                         for (let otherYear in globalCountryRankMap) {
-                            if (Number(otherYear) !== Number(year) && Number(globalCountryRankMap[otherYear]) === nuevaPos) {
-                                anoAfectado = otherYear;
+                            if (Number(otherYear) !== Number(year) && globalCountryRankMap[otherYear] === nuevaPos) {
+                                anoConMismaPos = otherYear;
                                 break;
                             }
                         }
 
-                        let viejaPosActual = globalCountryRankMap[year];
+                        // Si hay otro año con esa posición, intercambiamos (SWAP) la posición anterior del año actual a ese otro año
+                        let posicionAnterior = globalCountryRankMap[year];
                         globalCountryRankMap[year] = nuevaPos;
 
-                        if (anoAfectado) {
-                            // Le asignamos al año afectado la posición antigua que tenía este año
-                            globalCountryRankMap[anoAfectado] = viejaPosActual;
+                        if (anoConMismaPos && posicionAnterior !== null && posicionAnterior !== undefined) {
+                            globalCountryRankMap[anoConMismaPos] = posicionAnterior;
                         }
 
                         renderizarTabla(); 
