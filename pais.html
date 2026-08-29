@@ -146,7 +146,7 @@
         .decade-details div { display: flex; justify-content: space-between; }
         .decade-details span strong { color: #e6edf3; }
 
-        /* Colores exactos de la matriz proporcionada */
+        /* Colores exactos de la matriz */
         .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; }
         .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; }
         .pos-3 { background-color: #e08a1e !important; color: #000 !important; font-weight: bold; }
@@ -166,17 +166,36 @@
         th:hover { background: #30363d; }
         tr:hover { background: rgba(255, 255, 255, 0.02); }
 
+        /* Estilo estrecho para las columnas Posición y Ranking idéntico a la foto */
+        .col-narrow {
+            width: 75px;
+            min-width: 75px;
+            max-width: 75px;
+            white-space: nowrap;
+        }
+
         .th-date { font-size: 10px; color: #8b949e; font-weight: normal; display: block; margin-top: 2px; }
 
         .year-bold { font-weight: bold; color: #e6edf3; width: 15%; }
         
-        /* Celdas compactas al estilo de la matriz */
-        .cell-wrapper {
+        /* Celdas normales y compactas sin fondo de color en Notas */
+        .cell-wrapper-plain {
             display: inline-block;
             min-width: 32px;
             padding: 4px 6px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #e6edf3;
+            text-align: center;
+        }
+
+        .cell-wrapper {
+            display: inline-block;
+            width: 100%;
+            padding: 4px 0;
             border-radius: 4px;
-            font-size: 13px;
+            font-size: 14px;
+            font-weight: bold;
             text-align: center;
         }
 
@@ -184,10 +203,10 @@
             background: transparent; 
             border: none; 
             color: inherit; 
-            width: 40px; 
+            width: 45px; 
             text-align: center; 
-            font-size: 13px; 
-            font-weight: inherit;
+            font-size: 14px; 
+            font-weight: bold;
         }
         .input-score:focus, .input-country-rank:focus { outline: 1px dashed #00d2ff; background: rgba(0,0,0,0.2); }
         
@@ -201,12 +220,12 @@
         .modified-cell { outline: 2px solid #00d2ff !important; }
 
         .badge-readonly { 
-            padding: 4px 6px; 
+            padding: 4px 0; 
             border-radius: 4px; 
-            font-size: 13px; 
+            font-size: 14px; 
             font-weight: bold; 
             display: inline-block; 
-            min-width: 32px; 
+            width: 100%; 
         }
 
         .table-actions {
@@ -284,15 +303,15 @@
                     <tr>
                         <th onclick="ordenarTabla('year')">Año ↕</th>
                         <th onclick="ordenarTabla('score')">
-                            Notas ↕
+                            Notas
                             <span class="th-date" id="date-score">-</span>
                         </th>
-                        <th onclick="ordenarTabla('yearlyRank')">
-                            Posición ↕
+                        <th class="col-narrow" onclick="ordenarTabla('yearlyRank')">
+                            Posición
                             <span class="th-date" id="date-yearly">-</span>
                         </th>
-                        <th onclick="ordenarTabla('countryRank')">
-                            Ranking ↕
+                        <th class="col-narrow" onclick="ordenarTabla('countryRank')">
+                            Ranking
                             <span class="th-date" id="date-country">-</span>
                         </th>
                     </tr>
@@ -344,6 +363,8 @@
         let currentSortColumn = 'year';
         let currentSortAsc = true;
         let totalAnosDisponiblesCount = 0;
+        
+        let totalParticipantesPorAnoMap = {}; // Guardará el total de países participantes por año
 
         async function cargarDatosPais() {
             const titleEl = document.getElementById('country-title');
@@ -373,42 +394,60 @@
                 if (globalScoresData.length === 0) return;
 
                 globalRetiradosMap = {};
+                totalParticipantesPorAnoMap = {};
                 let anosSet = new Set();
+                
                 festivalData.forEach(f => {
                     if (f.country && f.year) {
                         anosSet.add(f.year);
                         if (!globalRetiradosMap[f.year]) globalRetiradosMap[f.year] = {};
+                        
                         if (f.withdrawn === true || f.withdrawn === 'true') {
                             globalRetiradosMap[f.year][f.country] = true;
+                        } else {
+                            // Contabilizar países participantes activos por año
+                            if (!totalParticipantesPorAnoMap[f.year]) totalParticipantesPorAnoMap[f.year] = 0;
+                            totalParticipantesPorAnoMap[f.year]++;
                         }
                     }
                 });
                 totalAnosDisponiblesCount = anosSet.size;
                 
                 globalYearlyRankingsMap = {};
+                let ultimaFechaYearly = null;
                 yearlyData.forEach(y => { 
                     if (y.country === currentCountryName) {
                         globalYearlyRankingsMap[y.year] = y.rank; 
+                        if (y.date) ultimaFechaYearly = y.date;
                     }
                 });
                 
                 globalCountryRankMap = {};
+                let ultimaFechaCountry = null;
                 countryRankData.forEach(c => { 
                     if (c.country === currentCountryName) {
                         globalCountryRankMap[c.year] = c.position; 
+                        if (c.date) ultimaFechaCountry = c.date;
                     }
                 });
 
-                // Extracción de fechas dinámicas de actualización para las cabeceras
-                if (globalScoresData.length > 0 && globalScoresData[0].date) {
-                    document.getElementById('last-update-date').textContent = `Última actualización general: ${globalScoresData[0].date}`;
-                    document.getElementById('date-score').textContent = globalScoresData[0].date;
+                // Extracción exacta de las fechas 'date' de cada tabla en la BBDD
+                let ultimaFechaScore = null;
+                if (globalScoresData.length > 0) {
+                    // Buscar la primera fecha válida en los scores del país
+                    const scoreConFecha = globalScoresData.find(s => s.date);
+                    if (scoreConFecha) ultimaFechaScore = scoreConFecha.date;
                 }
-                if (yearlyData.length > 0 && yearlyData[0].date) {
-                    document.getElementById('date-yearly').textContent = yearlyData[0].date;
+
+                if (ultimaFechaScore) {
+                    document.getElementById('last-update-date').textContent = `Última actualización general: ${ultimaFechaScore}`;
+                    document.getElementById('date-score').textContent = ultimaFechaScore;
                 }
-                if (countryRankData.length > 0 && countryRankData[0].date) {
-                    document.getElementById('date-country').textContent = countryRankData[0].date;
+                if (ultimaFechaYearly) {
+                    document.getElementById('date-yearly').textContent = ultimaFechaYearly;
+                }
+                if (ultimaFechaCountry) {
+                    document.getElementById('date-country').textContent = ultimaFechaCountry;
                 }
 
                 guardarEstadoOriginal();
@@ -442,19 +481,23 @@
             return globalRetiradosMap[year] && globalRetiradosMap[year][currentCountryName] === true;
         }
 
-        // Lógica de gradiente de colores exacta solicitada
-        function obtenerClaseGradienteRanking(pos, totalParticipantes) {
+        // Lógica de colores adaptativa exacta según el total de participantes de ese año específico
+        function obtenerClaseGradienteRanking(pos, totalParticipantesAnio) {
             if (pos === null || isNaN(pos)) return 'pos-none';
             if (pos === 1) return 'pos-1';
             if (pos === 2) return 'pos-2';
             if (pos === 3) return 'pos-3';
             if (pos <= 5) return 'pos-green-dark';
             if (pos <= 10) return 'pos-green-mid';
-            if (pos <= 26) return 'pos-green-light';
-            if (pos <= 30) return 'pos-orange-light';
             
-            if (pos === totalParticipantes) return 'pos-last';
-            if (pos >= totalParticipantes - 4) return 'pos-orange-strong';
+            // Colores intermedios dinámicos
+            let umbralVerdeClaro = Math.floor(totalParticipantesAnio * 0.6);
+            if (pos <= umbralVerdeClaro) return 'pos-green-light';
+            if (pos <= umbralVerdeClaro + 3) return 'pos-orange-light';
+            
+            // Bottom y peores posiciones basados estrictamente en el total de participantes del año
+            if (pos === totalParticipantesAnio) return 'pos-last';
+            if (pos >= totalParticipantesAnio - 4) return 'pos-orange-strong';
             return 'pos-orange-std';
         }
 
@@ -573,6 +616,7 @@
             datosOrdenados.forEach(item => {
                 const year = item.year;
                 const isWithdrawn = esPaisRetirado(year);
+                const totalPartAnio = totalParticipantesPorAnoMap[year] || 25; // fallback seguro
 
                 const tr = document.createElement('tr');
                 
@@ -581,13 +625,13 @@
                 tdYear.textContent = year;
                 tr.appendChild(tdYear);
 
-                // Columna Notas (editable)
+                // Columna Notas (editable pero SIN color de fondo por petición explícita)
                 const tdScore = document.createElement('td');
                 if (isWithdrawn) {
                     tdScore.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
                 } else {
                     const wrapper = document.createElement('div');
-                    wrapper.className = 'cell-wrapper pos-green-light'; // color base neutro/suave para nota o editable
+                    wrapper.className = 'cell-wrapper-plain';
                     
                     const inputScore = document.createElement('input');
                     inputScore.type = 'number';
@@ -623,10 +667,10 @@
                 }
                 tr.appendChild(tdScore);
 
-                // Columna Posición en el Festival (con gradiente estricto)
+                // Columna Posición en el Festival (Ancho estrecho y colores basados estrictamente en el total de ese año)
                 const tdYearlyRank = document.createElement('td');
+                tdYearlyRank.className = 'col-narrow';
                 const posYearly = globalYearlyRankingsMap[year];
-                const totalPartAnio = totalAnosDisponiblesCount > 0 ? totalAnosDisponiblesCount : 30;
 
                 if (isWithdrawn || posYearly === undefined || posYearly === null) {
                     tdYearlyRank.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
@@ -636,8 +680,9 @@
                 }
                 tr.appendChild(tdYearlyRank);
 
-                // Columna Ranking del País (con gradiente estricto y compacto)
+                // Columna Ranking del País (Ancho estrecho y números grandes legibles)
                 const tdCountryRank = document.createElement('td');
+                tdCountryRank.className = 'col-narrow';
                 if (isWithdrawn) {
                     tdCountryRank.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
                 } else {
