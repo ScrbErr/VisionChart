@@ -446,7 +446,6 @@
                 let rawYearlyData = await resYearly.json();
                 let rawCountryRankData = await resCountryRank.json();
 
-                // Filtrar para quedarnos únicamente con la entrada más reciente (por fecha) de cada año
                 let scoresMapObj = {};
                 rawScoresData.forEach(item => {
                     if (!scoresMapObj[item.year]) scoresMapObj[item.year] = item;
@@ -486,27 +485,48 @@
                 
                 globalYearlyRankingsMap = {};
                 let ultimaFechaYearly = null;
+                
+                // Obtener la fecha más reciente absoluta de toda la tabla yearly_rankings para este país
+                let maxDateYearly = null;
                 Object.values(yearlyMapObj).forEach(y => { 
                     if (y.country === currentCountryName) {
                         globalYearlyRankingsMap[y.year] = y.rank; 
-                        if (y.date) ultimaFechaYearly = y.date;
+                        if (y.date) {
+                            if (!maxDateYearly || y.date > maxDateYearly) {
+                                maxDateYearly = y.date;
+                            }
+                        }
                     }
                 });
+                ultimaFechaYearly = maxDateYearly;
                 
                 globalCountryRankMap = {};
                 let ultimaFechaCountry = null;
+                
+                // Obtener la fecha más reciente absoluta de toda la tabla country_rankings para este país
+                let maxDateCountry = null;
                 Object.values(countryRankMapObj).forEach(c => { 
                     if (c.country === currentCountryName) {
                         globalCountryRankMap[c.year] = c.position; 
-                        if (c.date) ultimaFechaCountry = c.date;
+                        if (c.date) {
+                            if (!maxDateCountry || c.date > maxDateCountry) {
+                                maxDateCountry = c.date;
+                            }
+                        }
                     }
                 });
+                ultimaFechaCountry = maxDateCountry;
 
                 let ultimaFechaScore = null;
-                if (globalScoresData.length > 0) {
-                    const scoreConFecha = globalScoresData.find(s => s.date);
-                    if (scoreConFecha) ultimaFechaScore = scoreConFecha.date;
-                }
+                let maxDateScore = null;
+                rawScoresData.forEach(s => {
+                    if (s.date) {
+                        if (!maxDateScore || s.date > maxDateScore) {
+                            maxDateScore = s.date;
+                        }
+                    }
+                });
+                ultimaFechaScore = maxDateScore;
 
                 if (ultimaFechaScore) {
                     document.getElementById('last-update-date').textContent = `Última actualización general: ${ultimaFechaScore}`;
