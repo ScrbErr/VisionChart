@@ -383,6 +383,9 @@
             "Luxembourg": "lu", "Monaco": "mc", "Yugoslavia": "yu", "Canada": "ca"
         };
 
+        // Lista ordenada alfabéticamente de todos los países para obtener su índice exacto de 2 dígitos (ej: '01', '10', etc.)
+        const sortedAllCountries = Object.keys(countryCodes).sort();
+
         let currentCountryName = '';
         let globalScoresData = [];
         let globalRetiradosMap = {}; 
@@ -410,6 +413,18 @@
                 if (p.type === 'day') day = p.value;
             }
             return `${year}-${month}-${day}`;
+        }
+
+        // Función para generar el ID personalizado (últimos 3 dígitos del año + número de orden alfabético del país de 2 dígitos)
+        function generarCustomId(year, countryName) {
+            const yearStr = String(year);
+            const last3Year = yearStr.slice(-3).padStart(3, '0');
+            
+            // Buscar índice en orden alfabético (1-based)
+            const index = sortedAllCountries.indexOf(countryName);
+            const countryNum = index !== -1 ? String(index + 1).padStart(2, '0') : '01';
+            
+            return last3Year + countryNum;
         }
 
         async function cargarDatosPais() {
@@ -833,13 +848,17 @@
                     let originalScore = originalState[year]?.score;
                     let originalPosPais = originalState[year]?.countryRank;
 
-                    // Si la nota ha cambiado, INSERTAR una NUEVA tupla en la BBDD (POST)
+                    // Generar el ID personalizado con el formato requerido (ej: 02601)
+                    let customId = generarCustomId(year, currentCountryName);
+
+                    // Si la nota ha cambiado, insertar nueva tupla en la tabla 'scores' incluyendo id y country
                     if (nuevoScore !== originalScore) {
                         promesas.push(
                             fetch(`${SUPABASE_URL}/scores`, {
                                 method: 'POST',
                                 headers: headers,
                                 body: JSON.stringify({ 
+                                    id: customId,
                                     country: currentCountryName, 
                                     year: year, 
                                     score: nuevoScore, 
@@ -849,13 +868,14 @@
                         );
                     }
 
-                    // Si la posición de ranking ha cambiado, INSERTAR una NUEVA tupla en la BBDD (POST)
+                    // Si la posición de ranking ha cambiado, insertar nueva tupla en la tabla 'country_rankings' incluyendo id y country
                     if (nuevaPosPais !== originalPosPais) {
                         promesas.push(
                             fetch(`${SUPABASE_URL}/country_rankings`, {
                                 method: 'POST',
                                 headers: headers,
                                 body: JSON.stringify({ 
+                                    id: customId,
                                     country: currentCountryName, 
                                     year: year, 
                                     position: nuevaPosPais, 
