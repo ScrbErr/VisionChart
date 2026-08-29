@@ -355,6 +355,795 @@
                 festivalData.forEach(f => { globalFestivalMap[f.year] = f; });
                 globalFestivalListCache = festivalData;
                 
+                globalYearlyRankingsMap = {};
+                yearlyData.forEach(y => { 
+                    if (y.country === currentCountryName) {
+                        globalYearlyRankingsMap[y.year] = y.rank; 
+                    }
+                });
+                
+                globalCountryRankMap = {};
+                countryRankData.forEach(c => { 
+                    if (c.country === currentCountryName) {
+                        globalCountryRankMap[c.year] = c.position; 
+                    }
+                });
+
+                if (globalScoresData.length > 0 && globalScoresData[0].date) {
+                    document.getElementById('last-update-date').textContent = `Última actualización: ${globalScoresData[0].date}`;
+                }
+
+                guardarEstadoOriginal();
+                procesarEstadisticasCabecera(globalScoresData, yearlyData, globalFestivalMap);
+                renderizarTabla();
+                renderizarGraficaPais(globalScoresData.filter(i => i.score !== null), currentCountryName);
+
+            } catch (error) { console.error(error); }
+        }
+
+        function guardarEstadoOriginal() {
+            originalState = {};
+            globalScoresData.forEach(item => {
+                originalState[item.year] = {
+                    score: item.score,
+                    countryRank: globalCountryRankMap[item.year] !== undefined ? globalCountryRankMap[item.year] : null
+                };
+            });
+        }
+
+        function cargarBandera(countryName) {
+            const code = countryCodes[countryName];
+            if (code) {
+                const flagImg = document.getElementById('country-flag');
+                flagImg.src = `https://flagcdn.com/w320/${code.toLowerCase()}.png`;
+                flagImg.style.display = 'block';
+            }
+        }
+
+        function obtenerTotalParticipantesAnio(year) {
+            const delAnio = globalFestivalListCache.filter(f => f.year === year && f.withdrawn === false);
+            if (delAnio.length > 0) return delAnio.length;
+            let count = 0;
+            Object.values(globalFestivalMap).forEach(f => {
+                if (f.year === year && f.withdrawn === false) count++;
+            });
+            return count > 0 ? count : 30;
+        }
+
+        // Corrección de la lógica de participación: Comprobamos si la tabla festival tiene explícitamente withdrawn === true o país ausente de la lista de ese año, evitando falsos positivos.
+        function esPaisRetirado(year) {
+            const fest = globalFestivalMap[year];
+            if (!fest) return false; // Si no hay registro en festival, asumimos que no hay motivo de retirada forzosa a menos que se indique lo contrario.
+            return fest.withdrawn === true;
+        }
+
+        function obtenerClaseGradienteRanking(pos, totalParticipantes) {
+            if (pos === null || isNaN(pos)) return 'pos-none';
+            if (pos === 1) return 'pos-1';
+            if (pos === 2) return 'pos-2';
+            if (pos === 3) return 'pos-3';
+            if (pos <= 5) return 'pos-green-dark';
+            if (pos <= 10) return 'pos-green-mid';
+            if (pos <= 26) return 'pos-green-light';
+            if (pos <= 30) return 'pos-orange-light';
+            
+            if (pos === totalParticipantes) return 'pos-last';
+            if (pos >= totalParticipantes - 4) return 'pos-orange-strong';
+            return 'pos-orange-std';
+        }
+
+        function procesarEstadisticasCabecera(scoresData, yearlyData, festivalMap) {
+            const scoresValidos = scoresData.filter(i => i.score !== null && !isNaN(i.score));
+            if (scoresValidos.length === 0) return;
+
+            const sumaScores = scoresValidos.reduce((acc, curr) => acc + Number(curr.score), 0);
+            document.getElementById('hero-avg-score').textContent = (sumaScores / scoresValidos.length).toFixed(2);
+
+            const ranksValidos = yearlyData.filter(i => i.rank !== null && !isNaN(i.rank));
+            if (ranksValidos.length > 0) {
+                const sumaRanks = ranksValidos.reduce((acc, curr) => acc + Number(curr.rank), 0);
+                document.getElementById('hero-avg-rank').textContent = `${(sumaRanks / ranksValidos.length).toFixed(1)}º`;
+            } else {
+                document.getElementById('hero-avg-rank').textContent = 'N/A';
+            }
+
+            let participaciones = 0;
+            scoresData.forEach(item => {
+                if (!esPaisRetirado(item.year)) participaciones++;
+            });
+            document.getElementById('hero-participations').textContent = participaciones;
+
+            let mejorNota = scoresValidos.reduce((max, curr) => Number(curr.score) > Number(max.score) ? curr : max, scoresValidos[0]);
+            let mejorRank = ranksValidos.length > 0 ? ranksValidos.reduce((min, curr) => Number(curr.rank) < Number(min.rank) ? curr : min, ranksValidos[0]) : null;
+
+            document.getElementById('history-best-score').innerHTML = `${Number(mejorNota.score).toFixed(2)} <span>(${mejorNota.year})</span>`;
+            document.getElementById('history-best-rank').innerHTML = mejorRank ? `${mejorRank.rank}º <span>(${mejorRank.year})</span>` : 'N/A';
+            document.getElementById('global-records-box').style.display = 'flex';
+
+            const decadasMap = {};
+            scoresData.forEach(item => {
+                const decadaKey = Math.floor(item.year / 10) * 10 + 's';
+                if (!decadasMap[decadaKey]) decadasMap[decadaKey] = [];
+                const yearlyMatch = yearlyData.find(y => y.year === item.year);
+                decadasMap[decadaKey].push({
+                    year: item.year,
+                    score: item.score !== null ? Number(item.score) : null,
+                    rank: yearlyMatch && yearlyMatch.rank !== null ? Number(yearlyMatch.rank) : null
+                });
+            });
+
+            const grid = document.getElementById('decades-grid');
+            grid.innerHTML = '';
+
+            Object.keys(decadasMap).sort().forEach(decada => {
+                const items = decadasMap[decada];
+                const validScores = items.filter(i => i.score !== null);
+                if (validScores.length === 0) return;
+
+                const mediaScore = (validScores.reduce((acc, curr) => acc + curr.score, 0) / validScores.length).toFixed(2);
+                const validRanks = items.filter(i => i.rank !== null && !isNaN(i.rank));
+                const mediaRank = validRanks.length > 0 ? (validRanks.reduce((acc, curr) => acc + curr.rank, 0) / validRanks.length).toFixed(1) + 'º' : 'N/A';
+
+                const bestScoreDec = validScores.reduce((max, curr) => curr.score > max.score ? curr : max, validScores[0]);
+                const bestRankDec = validRanks.length > 0 ? validRanks.reduce((min, curr) => curr.rank < min.rank ? curr : min, validRanks[0]) : null;
+                const top10Count = validRanks.filter(i => i.rank <= 10).length;
+
+                const box = document.createElement('div');
+                box.className = 'stat-box';
+                box.innerHTML = `
+                    <h5>${decada}</h5>
+                    <div class="decade-main-stats">
+                        <div class="decade-stat-col"><span>Nota</span><strong>${mediaScore}</strong></div>
+                        <div class="decade-stat-col"><span>Pos</span><strong>${mediaRank}</strong></div>
+                    </div>
+                    <div class="decade-details">
+                        <div><span>Mejor Nota:</span> <strong>${bestScoreDec.score.toFixed(2)} (${bestScoreDec.year})</strong></div>
+                        <div><span>Mejor Pos:</span> <strong>${bestRankDec ? bestRankDec.rank + 'º (' + bestRankDec.year + ')' : 'N/A'}</strong></div>
+                        <div><span>Top 10:</span> <strong>${top10Count}</strong></div>
+                    </div>
+                `;
+                grid.appendChild(box);
+            });
+        }
+
+        function renderizarTabla() {
+            const tbody = document.getElementById('scores-table-body');
+            tbody.innerHTML = '';
+
+            // Calcular número total de participaciones reales (años donde no hay withdrawn)
+            const participacionesValidas = globalScoresData.filter(i => !esPaisRetirado(i.year)).length;
+
+            let datosOrdenados = [...globalScoresData].sort((a, b) => {
+                const isWithdrawnA = esPaisRetirado(a.year) ? 1 : 0;
+                const isWithdrawnB = esPaisRetirado(b.year) ? 1 : 0;
+
+                if (isWithdrawnA !== isWithdrawnB) {
+                    return isWithdrawnA - isWithdrawnB; 
+                }
+
+                let valA, valB;
+                if (currentSortColumn === 'year') {
+                    valA = a.year;
+                    valB = b.year;
+                } else if (currentSortColumn === 'score') {
+                    valA = a.score !== null && a.score !== undefined ? Number(a.score) : -999;
+                    valB = b.score !== null && b.score !== undefined ? Number(b.score) : -999;
+                    if (valA === -999 && valB !== -999) return 1;
+                    if (valB === -999 && valA !== -999) return -1;
+                } else if (currentSortColumn === 'yearlyRank') {
+                    valA = globalYearlyRankingsMap[a.year] !== undefined && globalYearlyRankingsMap[a.year] !== null ? Number(globalYearlyRankingsMap[a.year]) : 9999;
+                    valB = globalYearlyRankingsMap[b.year] !== undefined && globalYearlyRankingsMap[b.year] !== null ? Number(globalYearlyRankingsMap[b.year]) : 9999;
+                    if (valA === 9999 && valB !== 9999) return 1;
+                    if (valB === 9999 && valA !== 9999) return -1;
+                } else if (currentSortColumn === 'countryRank') {
+                    valA = globalCountryRankMap[a.year] !== undefined && globalCountryRankMap[a.year] !== null ? Number(globalCountryRankMap[a.year]) : 9999;
+                    valB = globalCountryRankMap[b.year] !== undefined && globalCountryRankMap[b.year] !== null ? Number(globalCountryRankMap[b.year]) : 9999;
+                    if (valA === 9999 && valB !== 9999) return 1;
+                    if (valB === 9999 && valA !== 9999) return -1;
+                }
+
+                return currentSortAsc ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+            });
+
+            datosOrdenados.forEach(item => {
+                const year = item.year;
+                const isWithdrawn = esPaisRetirado(year);
+
+                const tr = document.createElement('tr');
+                
+                // 1. Columna Año en Negrita
+                const tdYear = document.createElement('td');
+                tdYear.className = 'year-bold';
+                tdYear.textContent = year;
+                tr.appendChild(tdYear);
+
+                // 2. Columna Notas (Si no participó, muestra // y no es editable)
+                const tdScore = document.createElement('td');
+                if (isWithdrawn) {
+                    tdScore.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
+                } else {
+                    const inputScore = document.createElement('input');
+                    inputScore.type = 'number';
+                    inputScore.min = '0';
+                    inputScore.max = '100';
+                    inputScore.className = 'input-score';
+                    inputScore.value = item.score !== null && item.score !== undefined ? item.score : '';
+                    
+                    if (originalState[year] && originalState[year].score !== item.score) {
+                        inputScore.classList.add('modified-cell');
+                    }
+
+                    inputScore.addEventListener('input', () => {
+                        let val = inputScore.value;
+                        if (val !== '') {
+                            let num = Number(val);
+                            if (num < 0) inputScore.value = 0;
+                            if (num > 100) inputScore.value = 100;
+                        }
+                    });
+
+                    inputScore.addEventListener('change', () => {
+                        item.score = inputScore.value === '' ? null : Number(inputScore.value);
+                        if (originalState[year] && originalState[year].score !== item.score) {
+                            inputScore.classList.add('modified-cell');
+                        } else {
+                            inputScore.classList.remove('modified-cell');
+                        }
+                    });
+                    tdScore.appendChild(inputScore);
+                }
+                tr.appendChild(tdScore);
+
+                // 3. Columna Posición en el Festival (Tabla yearly_rankings pura, // si no participó)
+                const tdYearlyRank = document.createElement('td');
+                const posYearly = globalYearlyRankingsMap[year];
+                const totalPartAnio = obtenerTotalParticipantesAnio(year);
+
+                if (isWithdrawn || posYearly === undefined || posYearly === null) {
+                    tdYearlyRank.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
+                } else {
+                    const claseGrad = obtenerClaseGradienteRanking(Number(posYearly), totalPartAnio);
+                    tdYearlyRank.innerHTML = `<span class="badge-readonly ${claseGrad}">${posYearly}º</span>`;
+                }
+                tr.appendChild(tdYearlyRank);
+
+                // 4. Columna Ranking del país por año (Restricción estricta: entre 1 y participacionesValidas, sin duplicados)
+                const tdCountryRank = document.createElement('td');
+                if (isWithdrawn) {
+                    tdCountryRank.innerHTML = `<span class="badge-readonly pos-none">//</span>`;
+                } else {
+                    const inputCountryRank = document.createElement('input');
+                    inputCountryRank.type = 'number';
+                    inputCountryRank.min = '1';
+                    inputCountryRank.max = participacionesValidas;
+                    inputCountryRank.className = 'input-country-rank';
+                    
+                    let currentPos = globalCountryRankMap[year];
+                    inputCountryRank.value = currentPos !== undefined && currentPos !== null ? currentPos : '';
+
+                    if (originalState[year] && originalState[year].countryRank !== currentPos) {
+                        inputCountryRank.classList.add('modified-cell');
+                    }
+
+                    inputCountryRank.addEventListener('change', () => {
+                        let nuevaPos = parseInt(inputCountryRank.value);
+                        if (isNaN(nuevaPos)) return;
+                        
+                        // Si se introduce un número mayor que el máximo de participaciones, se fija automáticamente al máximo
+                        if (nuevaPos > participacionesValidas) {
+                            nuevaPos = participacionesValidas;
+                        }
+                        if (nuevaPos < 1) {
+                            nuevaPos = 1;
+                        }
+
+                        // Validación de unicidad: Si el número ya está ocupado en otro año, se desplaza/intercambia o reajusta
+                        for (let otherYear in globalCountryRankMap) {
+                            if (Number(otherYear) !== Number(year) && globalCountryRankMap[otherYear] === nuevaPos) {
+                                // Buscar un hueco libre o intercambiar si hay conflicto, asegurando que no queden duplicados
+                                globalCountryRankMap[otherYear] = currentPos !== undefined && currentPos !== null ? currentPos : participacionesValidas;
+                                break;
+                            }
+                        }
+
+                        globalCountryRankMap[year] = nuevaPos;
+                        renderizarTabla(); 
+                    });
+
+                    const claseGradCountry = obtenerClaseGradienteRanking(currentPos, participacionesValidas);
+                    inputCountryRank.classList.add(claseGradCountry);
+                    tdCountryRank.appendChild(inputCountryRank);
+                }
+                tr.appendChild(tdCountryRank);
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        function ordenarTabla(columna) {
+            if (currentSortColumn === columna) {
+                currentSortAsc = !currentSortAsc;
+            } else {
+                currentSortColumn = columna;
+                currentSortAsc = true;
+            }
+            renderizarTabla();
+        }
+
+        async function actualizarCambios() {
+            try {
+                const headers = { 
+                    'apikey': SUPABASE_ANON_KEY, 
+                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 
+                    'Content-Type': 'application/json', 
+                    'Prefer': 'return=minimal' 
+                };
+
+                let promesas = [];
+
+                globalScoresData.forEach(item => {
+                    let year = item.year;
+                    let nuevoScore = item.score;
+                    let nuevaPosPais = globalCountryRankMap[year];
+                    
+                    let originalScore = originalState[year]?.score;
+                    let originalPosPais = originalState[year]?.countryRank;
+
+                    if (nuevoScore !== originalScore) {
+                        let fechaEspanola = `${year}-05-15`;
+                        promesas.push(
+                            fetch(`${SUPABASE_URL}/scores?country=eq.${encodeURIComponent(currentCountryName)}&year=eq.${year}`, {
+                                method: 'PATCH',
+                                headers: headers,
+                                body: JSON.stringify({ score: nuevoScore, date: fechaEspanola })
+                            })
+                        );
+                    }
+
+                    if (nuevaPosPais !== originalPosPais) {
+                        let fechaEspanola = `${year}-05-15`;
+                        promesas.push(
+                            fetch(`${SUPABASE_URL}/country_rankings?country=eq.${encodeURIComponent(currentCountryName)}&year=eq.${year}`, {
+                                method: 'PATCH',
+                                headers: headers,
+                                body: JSON.stringify({ position: nuevaPosPais, date: fechaEspanola })
+                            })
+                        );
+                    }
+                });
+
+                await Promise.all(promesas);
+                alert('¡Cambios actualizados correctamente en la base de datos!');
+                guardarEstadoOriginal();
+                renderizarTabla();
+            } catch (err) {
+                console.error(err);
+                alert('Hubo un error al actualizar los datos.');
+            }
+        }
+
+        function deshacerCambios() {
+            globalScoresData.forEach(item => {
+                let year = item.year;
+                if (originalState[year]) {
+                    item.score = originalState[year].score;
+                    globalCountryRankMap[year] = originalState[year].countryRank;
+                }
+            });
+            renderizarTabla();
+            alert('Se han deshecho los cambios no guardados.');
+        }
+
+        function exportarCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,Ano,Notas,Posicion en el Festival,Ranking Pais\n";
+            globalScoresData.forEach(item => {
+                let year = item.year;
+                let isWithdrawn = esPaisRetirado(year);
+                let score = isWithdrawn ? "//" : (item.score !== null && item.score !== undefined ? item.score : '');
+                let yearlyRank = isWithdrawn || globalYearlyRankingsMap[year] === undefined ? "//" : globalYearlyRankingsMap[year];
+                let countryRank = isWithdrawn || globalCountryRankMap[year] === undefined ? "//" : globalCountryRankMap[year];
+                csvContent += `${year},${score},${yearlyRank},${countryRank}\n`;
+            });
+
+            let encodedUri = encodeURI(csvContent);
+            let link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `historial_${currentCountryName}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function renderizarGraficaPais(validScores, countryName) {
+            const ctx = document.getElementById('chartCountryScores').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: validScores.map(i => i.year),
+                    datasets: [{
+                        label: `Notas ${countryName}`,
+                        data: validScores.map(i => i.score),
+                        borderColor: '#00d2ff',
+                        backgroundColor: 'rgba(0, 210, 255, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { min: 0, max: 100, grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 11 } } },
+                        x: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        cargarDatosPais();
+    </script>
+
+</body>
+</html><!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Detalle de País - VisionChart</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 1000px; 
+            margin: 30px auto; 
+            padding: 0 20px; 
+            background: #0d1117; 
+            color: #c9d1d9; 
+        }
+        h1 { color: #00d2ff; margin: 0 0 8px 0; font-size: 24px; }
+        .card { 
+            background: #161b22; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.6); 
+            margin-bottom: 20px; 
+            border: 1px solid #30363d;
+        }
+        .back-link { display: inline-block; margin-bottom: 12px; color: #00d2ff; text-decoration: none; font-weight: bold; font-size: 14px; }
+        .back-link:hover { text-decoration: underline; }
+
+        .unified-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .country-flag {
+            width: 100px;
+            height: 65px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid #30363d;
+            background: #21262d;
+            display: none;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
+        
+        .header-metrics-right {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .metric-box-big {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            padding: 10px 16px;
+            border-radius: 6px;
+            text-align: center;
+            min-width: 110px;
+        }
+        .metric-box-big span {
+            display: block;
+            font-size: 11px;
+            color: #8b949e;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+        }
+        .metric-box-big strong {
+            color: #00d2ff;
+            font-size: 18px;
+        }
+
+        .global-records-inline {
+            display: flex;
+            justify-content: space-around;
+            background: #0d1117;
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 1px solid #30363d;
+            margin-bottom: 15px;
+            font-size: 13px;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .global-records-inline span { color: #8b949e; }
+        .global-records-inline strong { color: #e6edf3; margin-left: 5px; }
+        .global-records-inline strong span { color: #00d2ff; font-weight: normal; }
+
+        .section-title {
+            color: #e6edf3;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+        }
+        .stat-box {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            padding: 12px;
+            border-radius: 6px;
+        }
+        .stat-box h5 {
+            margin: 0 0 8px 0;
+            color: #00d2ff;
+            font-size: 13px;
+            border-bottom: 1px solid #21262d;
+            padding-bottom: 4px;
+            text-align: center;
+        }
+        .decade-main-stats {
+            display: flex;
+            justify-content: space-between;
+            background: #161b22;
+            padding: 6px 10px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            text-align: center;
+            border: 1px solid #21262d;
+        }
+        .decade-stat-col { flex: 1; }
+        .decade-stat-col:first-child { border-right: 1px solid #30363d; }
+        .decade-stat-col span { display: block; font-size: 10px; color: #8b949e; }
+        .decade-stat-col strong { font-size: 15px; color: #00d2ff; }
+        
+        .decade-details {
+            font-size: 12px;
+            color: #8b949e;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .decade-details div { display: flex; justify-content: space-between; }
+        .decade-details span strong { color: #e6edf3; }
+
+        .pos-1 { background-color: #d4af37 !important; color: #000 !important; font-weight: bold; }
+        .pos-2 { background-color: #c0c0c0 !important; color: #000 !important; font-weight: bold; }
+        .pos-3 { background-color: #e08a1e !important; color: #000 !important; font-weight: bold; }
+        .pos-green-dark { background-color: #2ea043 !important; color: #fff !important; }
+        .pos-green-mid  { background-color: #3fb950 !important; color: #000 !important; }
+        .pos-green-light{ background-color: #56d364 !important; color: #000 !important; }
+        .pos-orange-light { background-color: #db6d28 !important; color: #fff !important; }
+        .pos-orange-std   { background-color: #bc4c00 !important; color: #fff !important; }
+        .pos-orange-strong{ background-color: #9e2a2b !important; color: #fff !important; }
+        .pos-last         { background-color: #7f1d1d !important; color: #fff !important; font-weight: bold; }
+        .pos-none         { background-color: #21262d !important; color: #8b949e !important; }
+
+        .table-container { overflow-x: auto; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; background: #0d1117; border-radius: 6px; overflow: hidden; border: 1px solid #30363d; font-size: 13px; }
+        th, td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #21262d; }
+        th { background: #21262d; color: #e6edf3; font-weight: bold; cursor: pointer; user-select: none; }
+        th:hover { background: #30363d; }
+        tr:hover { background: rgba(255, 255, 255, 0.02); }
+
+        .year-bold { font-weight: bold; color: #e6edf3; }
+        
+        .input-score, .input-country-rank { 
+            background: #161b22; 
+            border: 1px solid #30363d; 
+            color: #e6edf3; 
+            padding: 4px 8px; 
+            border-radius: 4px; 
+            width: 60px; 
+            text-align: center; 
+            font-size: 13px; 
+        }
+        .input-score:focus, .input-country-rank:focus { border-color: #00d2ff; outline: none; }
+        
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] { -moz-appearance: textfield; }
+
+        .modified-cell { border: 2px solid #00d2ff !important; }
+
+        .badge-readonly { 
+            padding: 5px 12px; 
+            border-radius: 4px; 
+            font-size: 13px; 
+            font-weight: bold; 
+            display: inline-block; 
+            min-width: 45px; 
+        }
+
+        .table-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            justify-content: center;
+            align-items: center;
+        }
+        .btn {
+            padding: 9px 20px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            border: 1px solid transparent;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            transition: filter 0.2s;
+        }
+        .btn:hover { filter: brightness(1.1); }
+        .btn-undo { background: #da3633; color: #fff; border-color: #f85149; }
+        .btn-update { background: #238636; color: #fff; border-color: #2ea043; }
+        .btn-export { background: #1f6feb; color: #fff; border-color: #388bfd; }
+
+        .chart-container { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; position: relative; height: 300px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <a href="index.html" class="back-link">← Volver al Inicio</a>
+
+    <div class="card">
+        <div class="unified-header">
+            <div class="header-left">
+                <img id="country-flag" class="country-flag" alt="Bandera">
+                <div>
+                    <h1 id="country-title">Cargando...</h1>
+                    <span id="last-update-date" style="font-size: 12px; color: #8b949e;">Última actualización: -</span>
+                </div>
+            </div>
+
+            <div class="header-metrics-right">
+                <div class="metric-box-big">
+                    <span>Nota General</span>
+                    <strong id="hero-avg-score">-</strong>
+                </div>
+                <div class="metric-box-big">
+                    <span>Pos. Media</span>
+                    <strong id="hero-avg-rank">-</strong>
+                </div>
+                <div class="metric-box-big">
+                    <span>Participaciones</span>
+                    <strong id="hero-participations">-</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="global-records-inline" id="global-records-box" style="display: none;">
+            <div><span>🏆 Mejor Nota Histórica:</span> <strong id="history-best-score">-</strong></div>
+            <div><span>🥇 Mejor Posición Histórica:</span> <strong id="history-best-rank">-</strong></div>
+        </div>
+
+        <h4 class="section-title">📊 Rendimiento por Décadas</h4>
+        <div class="stats-grid" id="decades-grid"></div>
+    </div>
+
+    <div class="card">
+        <h4 class="section-title">📋 Historial Anual</h4>
+        <div class="table-container">
+            <table id="historical-table">
+                <thead>
+                    <tr>
+                        <th onclick="ordenarTabla('year')">Año ↕</th>
+                        <th onclick="ordenarTabla('score')">Notas ↕</th>
+                        <th onclick="ordenarTabla('yearlyRank')">Posición en el Festival ↕</th>
+                        <th onclick="ordenarTabla('countryRank')">Ranking del país por año ↕</th>
+                    </tr>
+                </thead>
+                <tbody id="scores-table-body"></tbody>
+            </table>
+        </div>
+        <div class="table-actions">
+            <button class="btn btn-undo" onclick="deshacerCambios()">💾 DESHACER</button>
+            <button class="btn btn-update" onclick="actualizarCambios()">💾 ACTUALIZAR</button>
+            <button class="btn btn-export" onclick="exportarCSV()">💾 EXPORTAR CSV</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h4 class="section-title">📈 Progreso de Notas</h4>
+        <div class="chart-container">
+            <canvas id="chartCountryScores"></canvas>
+        </div>
+    </div>
+    
+    <script>
+        const SUPABASE_URL = 'https://vekvnvxxdhehqizndkbe.supabase.co/rest/v1';
+        const SUPABASE_ANON_KEY = 'sb_publishable_B3OZ26_f8n51pQAMjoEQbw_4K7zmGcl';
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const rawCountryName = urlParams.get('nombre');
+
+        const countryCodes = {
+            "Albania": "al", "Germany": "de", "Andorra": "ad", "Armenia": "am", "Australia": "au",
+            "Austria": "at", "Azerbaijan": "az", "Belgium": "be", "Belarus": "by", "Bosnia and Herzegovina": "ba",
+            "Bulgaria": "bg", "Cyprus": "cy", "Croatia": "hr", "Denmark": "dk", "Slovakia": "sk",
+            "Slovenia": "si", "Spain": "es", "Estonia": "ee", "Finland": "fi", "France": "fr",
+            "Georgia": "ge", "Greece": "gr", "Hungary": "hu", "Ireland": "ie", "Iceland": "is",
+            "Israel": "il", "Italy": "it", "Latvia": "lv", "Lithuania": "lt", "North Macedonia": "mk",
+            "Malta": "mt", "Moldova": "md", "Montenegro": "me", "Norway": "no", "Netherlands": "nl",
+            "Poland": "pl", "Portugal": "pt", "United Kingdom": "gb", "Czech Republic": "cz", "Czechia": "cz",
+            "Romania": "ro", "Russia": "ru", "San Marino": "sm", "Serbia": "rs", "Sweden": "se",
+            "Switzerland": "ch", "Turkey": "tr", "Ukraine": "ua", "Serbia and Montenegro": "cs", "Morocco": "ma",
+            "Luxembourg": "lu", "Monaco": "mc", "Yugoslavia": "yu", "Canada": "ca"
+        };
+
+        let currentCountryName = '';
+        let globalScoresData = [];
+        let globalFestivalMap = {};
+        let globalYearlyRankingsMap = {}; 
+        let globalCountryRankMap = {};    
+        let originalState = {};
+        let currentSortColumn = 'year';
+        let currentSortAsc = true;
+        let globalFestivalListCache = [];
+
+        async function cargarDatosPais() {
+            const titleEl = document.getElementById('country-title');
+            if (!rawCountryName) { titleEl.textContent = "País no especificado"; return; }
+
+            currentCountryName = decodeURIComponent(rawCountryName);
+            titleEl.textContent = currentCountryName;
+            
+            cargarBandera(currentCountryName);
+
+            try {
+                const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY };
+                const [resScores, resFestival, resYearly, resCountryRank] = await Promise.all([
+                    fetch(`${SUPABASE_URL}/scores?country=eq.${encodeURIComponent(currentCountryName)}&order=year.asc`, { headers }),
+                    fetch(`${SUPABASE_URL}/festival?order=year.asc`, { headers }),
+                    fetch(`${SUPABASE_URL}/yearly_rankings?country=eq.${encodeURIComponent(currentCountryName)}`, { headers }),
+                    fetch(`${SUPABASE_URL}/country_rankings?country=eq.${encodeURIComponent(currentCountryName)}`, { headers })
+                ]);
+
+                if (!resScores.ok || !resFestival.ok) throw new Error('Error BBDD');
+
+                globalScoresData = await resScores.json();
+                const festivalData = await resFestival.json();
+                const yearlyData = await resYearly.json();
+                const countryRankData = await resCountryRank.json();
+
+                if (globalScoresData.length === 0) return;
+
+                globalFestivalMap = {};
+                festivalData.forEach(f => { globalFestivalMap[f.year] = f; });
+                globalFestivalListCache = festivalData;
+                
                 // Mapeo estricto por país y año utilizando directamente yearly_rankings
                 globalYearlyRankingsMap = {};
                 yearlyData.forEach(y => { 
