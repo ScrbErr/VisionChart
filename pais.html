@@ -242,7 +242,6 @@
         }
         input[type=number] { -moz-appearance: textfield; }
 
-        /* Estilo diferenciado para celdas editadas sin usar azul celeste */
         .modified-cell { 
             outline: 3px solid #ff007f !important; 
             box-shadow: 0 0 8px rgba(255, 0, 127, 0.8) !important;
@@ -509,7 +508,6 @@
             return globalRetiradosMap[year] && globalRetiradosMap[year][currentCountryName] === true;
         }
 
-        // Lógica precisa de colores basada en los rangos y total de participaciones (ej: 40, 35, etc.)
         function obtenerClaseGradienteRanking(pos, totalParticipantesAnio) {
             if (pos === null || isNaN(pos)) return 'pos-none';
             if (pos === 1) return 'pos-1';
@@ -520,12 +518,9 @@
             if (pos >= 11 && pos <= 26) return 'pos-green-light';
             if (pos >= 27 && pos <= 30) return 'pos-orange-light';
 
-            // Si hay bottom 5 y último definidos dinámicamente según el total
-            let bottom5Inicio = totalParticipantesAnio - 4; // ej: 36 para 40, 31 para 35
+            let bottom5Inicio = totalParticipantesAnio - 4; 
             if (pos === totalParticipantesAnio) return 'pos-last';
             if (pos >= bottom5Inicio && pos < totalParticipantesAnio) return 'pos-bottom-5';
-            
-            // Si está entre 31 y bottom5Inicio (ej: 31-35)
             if (pos >= 31 && pos < bottom5Inicio) return 'pos-orange-strong';
 
             return 'pos-orange-std';
@@ -739,7 +734,6 @@
                         inputCountryRank.classList.add('modified-cell');
                     }
 
-                    // CORRECCIÓN CLAVE DE INTERCAMBIO (SWAP) PARA EVITAR DUPLICADOS Y CAMBIAR DE POSICIÓN CORRECTAMENTE
                     inputCountryRank.addEventListener('change', () => {
                         let nuevaPos = parseInt(inputCountryRank.value);
                         if (isNaN(nuevaPos)) {
@@ -751,7 +745,6 @@
                         if (nuevaPos > participacionesValidas) nuevaPos = participacionesValidas;
                         if (nuevaPos < 1) nuevaPos = 1;
 
-                        // Buscar si otro año ya tiene exactamente esta nueva posición
                         let anoConMismaPos = null;
                         for (let otherYear in globalCountryRankMap) {
                             if (Number(otherYear) !== Number(year) && globalCountryRankMap[otherYear] === nuevaPos) {
@@ -760,7 +753,6 @@
                             }
                         }
 
-                        // Si hay otro año con esa posición, intercambiamos (SWAP) la posición anterior del año actual a ese otro año
                         let posicionAnterior = globalCountryRankMap[year];
                         globalCountryRankMap[year] = nuevaPos;
 
@@ -855,16 +847,14 @@
         }
 
         function exportarCSV() {
-            let csvContent = "data:text/csv;charset=utf-8,Ano,Notas,Posicion en el Festival,Ranking de los Anos
-";
+            let csvContent = "data:text/csv;charset=utf-8,Ano,Notas,Posicion en el Festival,Ranking de los Anos\n";
             globalScoresData.forEach(item => {
                 let year = item.year;
                 let isWithdrawn = esPaisRetirado(year);
                 let score = isWithdrawn ? "//" : (item.score !== null && item.score !== undefined ? item.score : '');
                 let yearlyRank = isWithdrawn || globalYearlyRankingsMap[year] === undefined ? "//" : globalYearlyRankingsMap[year];
                 let countryRank = isWithdrawn || globalCountryRankMap[year] === undefined ? "//" : globalCountryRankMap[year];
-                csvContent += `${year},${score},${yearlyRank},${countryRank}
-`;
+                csvContent += `${year},${score},${yearlyRank},${countryRank}\n`;
             });
 
             let encodedUri = encodeURI(csvContent);
